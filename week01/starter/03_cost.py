@@ -21,6 +21,7 @@ import time
 
 from openai import OpenAI
 
+import project.prices
 from project.models import BASE_URL, API_KEY, LARGE, SMALL
 from project.prices import PRICE_DATE, estimate, local_cost_note
 from project.trace import write_json
@@ -101,6 +102,23 @@ def main() -> int:
     #
     #   Label them as estimates. They are not measurements and the price
     #   list is dated {PRICE_DATE}.
+
+    long_case = rows[1]
+    total_runs = 200*14*7 #200 cases , 14 weeks, once a day
+    #computing on small tier
+    small_tier = project.prices.estimate(long_case["prompt_tokens"], long_case["completion_tokens"], tier="small" )
+    #computing on large tier
+    large_tier = project.prices.estimate(long_case["prompt_tokens"], long_case["completion_tokens"], tier="large" )
+
+    cost_small = (small_tier.input_cost + small_tier.output_cost)
+    cost_large = (large_tier.input_cost + large_tier.output_cost)
+
+    print(f"Small tier nightly: €{cost_small*200:.2f}")
+    print(f"Large tier nightly: €{cost_large*200:.2f}")
+
+    print(f"Small tier semester: €{cost_small* total_runs:.2f}")
+    print(f"Large tier semester: €{cost_large* total_runs:.2f}")
+
 
     write_json("artifacts/week01_cost.json",
                {"rows": rows, "price_list_date": PRICE_DATE})

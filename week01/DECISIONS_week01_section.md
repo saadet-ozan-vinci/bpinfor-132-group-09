@@ -82,8 +82,8 @@ to give an answer.
 A 200-case golden set, at the token cost of my long case:
 
 | | one run | nightly for the semester |
-| small tier | | |
-| large tier | | |
+| small tier | 0.03| 3.28|
+| large tier |2.49 | 244.14|
 
 Estimates against the price list dated [date in `project/prices.py`], not
 measurements. Running locally, my actual monetary cost was zero.
@@ -91,7 +91,8 @@ measurements. Running locally, my actual monetary cost was zero.
 Which tier I would run nightly, which I would run before a release, and why
 not the same one for both:
 
-[...]
+I'd run the small tier nightly and run the large tier before a release.
+Running large tier every night would be too expensive but it is good to run it before a release to really test our application. 
 
 ### Deferred
 
