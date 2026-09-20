@@ -70,6 +70,17 @@ def main() -> int:
     #
     #   Record both. The first includes loading several gigabytes from disk,
     #   the second does not.
+    subprocess.run(["ollama", "stop", SMALL.name]) #releasing model from RAM to do a cold start
+
+    cold_call_time = timed(client, SHORT, SMALL.name)[1]
+    warm_call_time = timed(client, SHORT, SMALL.name)[1]
+
+    print(f"Cold call time: {cold_call_time:.2f}")
+    print(f"Warm call time: {warm_call_time:.2f}")
+    print(f"Ratio: {cold_call_time/warm_call_time:.2f}")
+
+
+
     #
     #   Then answer, in DECISIONS.md: your system will call two different
     #   models. What does this measurement tell you about switching between

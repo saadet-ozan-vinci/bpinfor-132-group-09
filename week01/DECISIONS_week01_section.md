@@ -10,21 +10,19 @@ to write.
 
 **Run conditions.** Everything below was produced on:
 
-- machine: [make, chip, RAM]
-- model: [the model name, exactly as `ollama list` prints it]
+- machine: Windows PC, Intel Core i7, 16 GB
+- model: qwen3:4b-instruct
 - served by: Ollama, one request at a time, locally
-- date: [YYYY-MM-DD]
+- date:  2026-09-16
 
 Every number in this file is meaningless without those four lines, so they
 are stated once here and referred to rather than repeated.
 
 ### 1. Machine and model set
 
-I am running the [required / required plus optional] model set.
+I am running the  required plus optional model set.
 
-[If you could not run the optional models, say so and say what you will do
-before week 9. This is a constraint on your project, not a failure, and
-naming it now is worth more than discovering it in week 9.]
+
 
 ### 2. The first call
 
@@ -37,41 +35,47 @@ naming it now is worth more than discovering it in week 9.]
 One sentence on the finish reason: what my program would do differently if
 it came back as a truncation rather than a normal stop.
 
-[...]
+It could do one of the following: provide a hardcoded answer or change the prompt to force the model to answer with less 
+tokens. (ex: Answer with 2 sentences)
 
 ### 3. Variance
 
 | cell | distinct (recording) | distinct (mine) | median latency |
-| closed_short, t=0.0 | 1/12 | | |
-| closed_short, t=1.0 | 1/12 | | |
-| open_list, t=0.0 | 1/12 | | |
-| open_list, t=1.0 | 11/12 | | |
+| closed_short, t=0.0 | 1/12 | 1/6| 0.29 s|
+| closed_short, t=1.0 | 1/12 | 1/6| 0.31 s|
+| open_list, t=0.0 | 1/12 |1/6 | 5.95 s|
+| open_list, t=1.0 | 11/12 | 6/6| 4.88 s|
 
 Which cell still returns a single answer at temperature 1.0, and why that
-one:
+one: closed_short|t10 returns one distinct answer at temperature 1.0. Because the prompt asks
+"What is the capital of Luxembourg? Answer in one word.", so the answer must be "Luxembourg" and nothing else. The
+probability of getting "Luxembourg" is so high that even setting the temperature to 1.0 doesn't change the outcome. 
 
-[...]
+My machine does agree with the recording. 
 
 Which cells a test asserting exact string equality would pass on, and what
-that tells me about testing this system:
+that tells me about testing this system: closed_short|t00, closed_short|t10, open_list|t00 pass.
+The string equality assertion is just a character by character check. It cannot verify if the meaning of those answers 
+were the same or not.
 
-[...]
 
-**The sentence that carries into week 10.** [One sentence about when you can
-and cannot rely on repeating an output. Week 10 will ask you to find this
-again. It should not say "the model is random", because your own table shows
-otherwise in most cells.]
+
+
+**The sentence that carries into week 10.** You can rely on repeating an output when the prompt has an obvious answer,
+like a one word fact. Otherwise, the output might be different everytime so we cannot rely on it. 
 
 ### 4. The cold start
 
-- cold call: [ ] s
-- warm call: [ ] s
-- ratio: [ ]
+- cold call: [10.86 ] s
+- warm call: [0.74 ] s
+- ratio: [14.73 ]
 
 What this implies for a system that uses more than one model, and what I
 will do about it:
 
-[...]
+On a machine with limited RAM, it is best to not go back and forth between models. For fast answers, use one model only.
+Because the machine will need to unload and load the models each time it does a switch, meaning it will take much longer
+to give an answer. 
 
 ### 5. Cost, estimated
 
