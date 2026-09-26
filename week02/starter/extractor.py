@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
@@ -40,12 +41,16 @@ class ServiceRequest(BaseModel):
         `str` cannot, and that the difference between `None` and `""` and
         `"none"` will cost you marks in the scorer if you are casual about it.
 
+
     quote: a span copied verbatim out of the message that supports your
         urgency decision. It is scored by substring search against the source,
         for free, with no model involved. That makes it the most valuable
         field on this schema and the reason it is here.
     """
-
+    due_date: date | None = Field(
+        description="Explicit calendar date in ISO format (YYYY-MM-DD) if explicitly mentioned in the text. Must be null if absent or if only a relative expression, for example: 'by next week', 'end of month' ",
+    )
+    quote: str = Field(max_length=200,description="quote must be copied character for character, not translated")
     category: Literal["access", "hardware", "billing", "facilities", "other"]
     urgency: Literal["urgent", "standard", "info"]
 
@@ -61,7 +66,13 @@ class ServiceRequest(BaseModel):
 # TODO 2. Build the messages.
 # --------------------------------------------------------------------------
 
-SYSTEM_ZERO_SHOT = """\
+SYSTEM_ZERO_SHOT = """Your job is to act as the help desk of Remerbaach, a fictional Luxembourg commune,
+ in English, French, and German. Four fields out of each. The messages arrive in English, French, or German.
+  The allowed values for category are ["access", "hardware", "billing", "facilities", "other"] and the allowed
+  values for urgency are ["urgent", "standard", "info"]. due_date is nullable, so the absent case has to be specified rather 
+  than discovered. the quote must be copied character for character, not translated"""
+
+"""\
 TODO 2a: write the system prompt.
 
 It has to state, in words a model will follow:
@@ -89,7 +100,7 @@ def build_messages(system: str, document_text: str) -> list[dict]:
     instruction and the data are in the same place, a document that contains
     an instruction is indistinguishable from your instruction.
     """
-    raise NotImplementedError("TODO 2b: return the two messages")
+    return [{"role": "system", "content": system}, {"role":"user", "content": document_text}]
 
 
 # --------------------------------------------------------------------------
