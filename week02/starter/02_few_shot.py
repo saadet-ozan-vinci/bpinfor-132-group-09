@@ -61,7 +61,27 @@ def few_shot_block(n: int = 4) -> str:
     stop copying verbatim, and the field that scored perfectly zero-shot
     will get worse. Look at the recording if you want to see that happen.
     """
-    raise NotImplementedError("TODO 5: build the example block")
+    selected_example_indexes= [0,2,3,4]
+    sample_quotes = {
+        0: "not blocking me",
+        4: "Merci de verifier avant le paiement du 30 septembre 2026",
+        2: "Ersatz waere bis zum 20/09/2026 gut",
+        3: "For information only",
+    }
+
+    lines = ["\nExamples:"]
+    for i in selected_example_indexes[:n]:
+        doc, gold = EXAMPLE_POOL[i]
+        output = {
+            "category": gold.category,
+            "urgency": gold.urgency,
+            "due_date": gold.due_date,
+            "quote": sample_quotes[i],
+        }
+        lines.append(f"Input: {doc.text}")
+        lines.append(f"Output: {json.dumps(output, ensure_ascii=False)}")
+
+    return "\n".join(lines)
 
 
 SYSTEM_FEW_SHOT = SYSTEM_ZERO_SHOT + "\n"   # + few_shot_block(), once written
