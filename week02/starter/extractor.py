@@ -48,7 +48,10 @@ class ServiceRequest(BaseModel):
         field on this schema and the reason it is here.
     """
     due_date: Optional[date] = None
-    quote: str
+    quote: str = Field(
+        max_length=150,
+        description="A short substring copied verbatim character-for-character from the message that supports the urgency decision.",
+    )
     category: Literal["access", "hardware", "billing", "facilities", "other"]
     urgency: Literal["urgent", "standard", "info"]
 

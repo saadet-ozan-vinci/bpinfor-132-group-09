@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 from unicodedata import category
 
-from week02.starter.documents import Gold
+from documents import Gold
 
 FIELDS = ("category", "urgency", "due_date", "quote")
 
