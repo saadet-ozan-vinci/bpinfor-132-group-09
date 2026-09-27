@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import time
 from datetime import date
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -47,10 +47,8 @@ class ServiceRequest(BaseModel):
         for free, with no model involved. That makes it the most valuable
         field on this schema and the reason it is here.
     """
-    due_date: date | None = Field(
-        description="Explicit calendar date in ISO format (YYYY-MM-DD) if explicitly mentioned in the text. Must be null if absent or if only a relative expression, for example: 'by next week', 'end of month' ",
-    )
-    quote: str = Field(max_length=200,description="quote must be copied character for character, not translated")
+    due_date: Optional[date] = None
+    quote: str
     category: Literal["access", "hardware", "billing", "facilities", "other"]
     urgency: Literal["urgent", "standard", "info"]
 

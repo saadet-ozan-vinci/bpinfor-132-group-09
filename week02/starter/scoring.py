@@ -16,6 +16,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from unicodedata import category
+
+from week02.starter.documents import Gold
+
 FIELDS = ("category", "urgency", "due_date", "quote")
 
 
@@ -71,8 +75,28 @@ def score_one(record, gold, document_text: str) -> dict[str, FieldResult]:
 
     Return a dict keyed by field name.
     """
-    raise NotImplementedError("TODO 3: score the four fields")
+    #check category
+    category_correct = record.category == gold.category
+    category_res = FieldResult(correct=category_correct, got=record.category, expected=gold.category)
 
+    #check urgency
+    urgency_correct = record.urgency == gold.urgency
+    urgency_res = FieldResult(correct=urgency_correct,got=record.urgency, expected=gold.urgency)
+
+    #check due date
+    date_iso = record.due_date.isoformat() if record.due_date else None
+    due_correct = (date_iso == gold.due_date)
+    due_res = FieldResult(
+        correct=due_correct,
+        got=date_iso,
+        expected=gold.due_date,
+    )
+
+    #check quote
+    quote_correct = bool(record.quote and record.quote in document_text)
+    quote_res = FieldResult(correct=quote_correct, got=record.quote, expected="substring of document_text")
+
+    return {"category": category_res, "urgency": urgency_res, "due_date": due_res, "quote": quote_res}
 
 # --------------------------------------------------------------------------
 # TODO 4. Aggregate.
@@ -92,8 +116,32 @@ def score_all(records, golds, docs) -> Scoreboard:
     you will be asked which records failed and why, not what your average
     was.
     """
-    raise NotImplementedError("TODO 4: aggregate into a Scoreboard")
+    fields = ["category", "urgency", "due_date", "quote"]
+    hits = {"category": 0, "urgency": 0, "due_date": 0, "quote": 0} #the amount of times each field was correct
+    total = 0 #nb of total documents
+    invalid= 0 #nb of invalid documents
+    failures = [] #failed fields
 
+    for i in range(len(records)):
+        record = records[i]
+        document = docs[i]
+        gold = golds[document.id]
+        total = total + 1
+        if record is None:
+            invalid += 1
+            for field in ["category", "urgency", "due_date", "quote"]:
+                failures.append((document.id, field, "validation failed: record is None"))
+        else:
+            score = score_one(record, gold, document.text)
+            for field in fields:
+                res = score[field]
+                if res.correct:
+                    hits[field] += 1
+                else:
+                    reason = res.note or f"got {res.got!r}, expected {res.expected!r}"
+                    failures.append((document.id, field, f"{field} failed: {reason}"))
+
+    return  Scoreboard(hits, total, invalid, failures)
 
 # --------------------------------------------------------------------------
 # Given.
