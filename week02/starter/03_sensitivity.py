@@ -16,9 +16,13 @@ One TODO marker.
 
 from __future__ import annotations
 
+import json
+from importlib import import_module
+few_shot_block = import_module("02_few_shot").few_shot_block
+
 import argparse
 
-from documents import DOCS, GOLD
+from documents import DOCS, GOLD, EXAMPLE_POOL
 from extractor import SYSTEM_ZERO_SHOT, get_client, run_variant
 from scoring import compare
 
@@ -62,7 +66,57 @@ def build_system(variant: str) -> str:
                    needed to attribute it. Week 13 asks who a system works
                    for, and this is what it costs to answer with evidence.
     """
-    raise NotImplementedError("TODO 8: build the variant")
+    baseline_prompt = SYSTEM_ZERO_SHOT+ "\n" + few_shot_block()
+
+    if variant== "role":
+        return "You are a senior service desk analyst.\n" + baseline_prompt
+
+    if variant == "reordered":
+        # re ordering few shot examples
+        sample_quotes = {
+            0: "not blocking me",
+            4: "Merci de verifier avant le paiement du 30 septembre 2026",
+            2: "Ersatz waere bis zum 20/09/2026 gut",
+            3: "For information only",
+        }
+        lines = ["\nExamples:"]
+        for i in [4, 3, 2, 0]:
+            doc, gold = EXAMPLE_POOL[i]
+            output = {
+                "category": gold.category,
+                "urgency": gold.urgency,
+                "due_date": gold.due_date,
+                "quote": sample_quotes[i],
+            }
+            lines.append(f"Input: {doc.text}")
+            lines.append(f"Output: {json.dumps(output, ensure_ascii=False)}")
+        return SYSTEM_ZERO_SHOT + "\n" + "\n".join(lines)
+
+    if variant == "no_delimiter":
+        return baseline_prompt.replace("Input: ", "").replace("Output: ", "")
+
+    if variant == "english_only":
+        #grabing only the english examples from the pool
+        english_indexes = [0, 3, 5, 0]
+        sample_quotes = {
+            0: "not blocking me",
+            3: "For information only",
+            5: "getting worse by the hour",
+        }
+        lines = ["\nExamples:"]
+        for i in english_indexes:
+            doc, gold = EXAMPLE_POOL[i]
+            output = {
+                "category": gold.category,
+                "urgency": gold.urgency,
+                "due_date": gold.due_date,
+                "quote": sample_quotes[i],
+            }
+            lines.append(f"Input: {doc.text}")
+            lines.append(f"Output: {json.dumps(output)}")
+        return SYSTEM_ZERO_SHOT + "\n" + "\n".join(lines)
+
+    return baseline_prompt
 
 
 def main() -> int:
