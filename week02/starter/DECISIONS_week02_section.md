@@ -82,7 +82,9 @@ ideally with at least one example for each. Furthermore, ten records is not a en
 shipping decision. 
 ### Sensitivity variant
 
-Variant assigned: [ ]. What I changed: [ ]. What moved: [ ].
+Variant assigned: role. What I changed: I added single sentence, telling what the role is to the prompt. What moved: 
+Accuracy shifted for some fields: category (+2) and due_date(+1) improved, quote (-1) dropped and urgency(+0) was unchanged.
+French documents had fewer errors (5 to 3).
 
 [If nothing moved, say so. A knob that changes nothing measurable is a real
 result, and it tells the room which knobs are worth arguing about.]
@@ -91,7 +93,8 @@ result, and it tells the room which knobs are worth arguing about.]
 
 Ten cases written to `artifacts/goldset.json`, tagged by language.
 
-One thing my scorer cannot currently detect:
+One thing my scorer cannot currently detect: It cannot detect if the quote chosen by the model is relevant or not.
+The only check is that the quote is a substring of the original document_text.
 
 [This is the most valuable line on the page. An example: "our scorer cannot
 tell a correctly formatted date that is simply the wrong date from a
