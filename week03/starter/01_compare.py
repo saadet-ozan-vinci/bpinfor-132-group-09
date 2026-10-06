@@ -6,8 +6,13 @@ Both systems run here on purpose. A comparison that lives in two scripts
 becomes two demonstrations, and by the time you have run them separately the
 conditions have drifted and you no longer know what you compared.
 """
-
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+#dynamically finding the path
+sys.path.append(str(Path(__file__).resolve().parents[2] / "week02" / "starter"))
+from extractor import SYSTEM_ZERO_SHOT, extract
 
 import argparse
 
@@ -154,6 +159,31 @@ def main() -> int:
     #
     #   Skip any case_id already in the file, so this is safe to re-run.
 
+    # TODO 6. Grow the gold set.
+    goldset_dict, loaded_from = load_or_reference("goldset.json", "week03")
+    print(f"goldset loaded from: {loaded_from}")
+
+    cases = goldset_dict.setdefault("cases", [])
+    existing_ids = {c["case_id"] for c in cases}
+
+    for q in QUERIES:
+        if q.id in existing_ids:
+            continue
+        slice_tags = [q.lang, q.route]
+        if q.ambiguous:
+            slice_tags.append("ambiguous")
+
+        case = GoldCase(
+            case_id=q.id,
+            week_added=3,
+            question=q.text,
+            expected={"route": q.route},
+            expected_behavior=f"Route query to {q.route}.",
+            slice_tags=slice_tags,
+        )
+        cases.append(case.model_dump())
+
+    write_json("artifacts/goldset.json", goldset_dict)
     # TODO 7. Answer four questions in DECISIONS.md. The comparison is the
     # deliverable, not the two running systems.
     #
