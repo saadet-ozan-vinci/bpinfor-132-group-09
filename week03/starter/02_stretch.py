@@ -51,7 +51,26 @@ def variant_model(client) -> None:
     tells you something about your threshold from TODO 3a that you cannot
     unsee.
     """
-    raise NotImplementedError("TODO 8: variant A, model routing")
+    #iterate through both models small and large
+    for m in (SMALL, LARGE):
+        routed_list= [] #init empty list that store final routing models for this model
+
+        #iterating through queries
+        for q in QUERIES:
+            #call router to get a classification decision and metadata
+            decisions, meta = classify(client, q.text , model = m.name)
+            #pass recieved decision to the policy layer (confidence, evidence check, fallback)
+            routed = apply_policy(decisions, q.text)
+            #add to routed list with results
+            routed_list.append(routed)
+        #compare the predicted routes against the gold labels
+        s = score_routes(routed_list, QUERIES)
+        print(f"\n --------------- {m.name} ---------------")
+        print(report(s, m.name))
+
+        #get resident memory from models
+        mem = mem = m.resident_gb
+        print(f"Resident memory: {mem} GB")
 
 
 def variant_voting(client, k: int = 3) -> None:

@@ -6,10 +6,8 @@ Copy this into your `DECISIONS.md` and fill it in.
 
 ## Week 3
 
-**Run conditions.** classifier model: [ ] | answering model: [ ] |
-temperature: 0.0 | served locally | date: [YYYY-MM-DD] | scored on: [the
-recording / my own machine]
-
+**Run conditions.** classifier model: qwen3:4b-instruct | answering model: qwen3:4b-instruct |
+temperature: 0.0 | served locally | date: 2026-10-12 | scored on: my own machine
 ### 1. The five route definitions
 
 | route | definition, one sentence, in terms of what the help desk must do |
@@ -108,20 +106,34 @@ system.
 
 ### 6. Stretch variant
 
-Variant assigned: [ ]. Result: [ ].
+Variant assigned: Model routing. 
+
+Result:
+- qwen3:4b-instruct:
+  - Route accuracy: 20/24 (16/20 excluding ambiguous)
+  - Per route: complaint 4/4, info 5/5, other 1/4, request 6/7, status 4/4
+  - Evidence verbatim: 24/24
+  - Confidence: min 0.00, max 1.00, distinct 4
+  - Resident memory: 3.9 GB
+- qwen2.5:7b:
+  - Route accuracy: 19/24 (18/20 excluding ambiguous)
+  - Per route: complaint 2/4, info 4/5, other 3/4, request 6/7, status 4/4
+  - Evidence verbatim: 23/24
+  - Confidence: min 0.95, max 1.00, distinct 2
+  - Resident memory: 5.0 GB
 
 [For model routing: report both models on accuracy, evidence verbatim, the
 confidence range, and resident memory. If the smaller model won, say so
 plainly and say what you think that means.]
 
-[For voting: report the split-vote count at each temperature. If nothing
-ever disagreed, that is the result. Say what it cost and what it bought.]
+The smaller model won, it was more accurate. I think it's because a smaller model is less confused about simple routing and doesn't over-evaluate everything, which can lead to mistakes.
+It follows narrow classification instructions directly rather than overthinking edge cases.
 
 ### The gold set
 
-`artifacts/goldset.json` now holds [ ] cases: 10 from week 2 and 24 added
+`artifacts/goldset.json` now holds 34 cases: 10 from week 2 and 24 added
 today, with the four ambiguous ones tagged.
 
 ### Deferred
 
-[Anything you did not get to, and why.]
+Nothing.
