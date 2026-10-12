@@ -46,7 +46,14 @@ def to_openai_schema(schema: dict[str, Any]) -> dict[str, Any]:
     tools.py calls it "input_schema". Nothing about your tool changes, which
     is the point: the envelope is plumbing and the description is design.
     """
-    raise NotImplementedError("TODO 1: convert the schema envelope")
+    return {
+        "type": "function",
+        "function": {
+            "name": schema["name"],
+            "description": schema["description"],
+            "parameters": schema["input_schema"],
+        },
+    }
 
 
 SCHEMAS = [to_openai_schema(s) for s in ANTHROPIC_SCHEMAS]
@@ -138,7 +145,38 @@ def run_tool_call(name: str, raw_arguments: str) -> tuple[Any, bool]:
     paste it into its answer, and you have just told whoever asked the
     question what your directory layout is.
     """
-    raise NotImplementedError("TODO 5: validate, execute, catch, cap")
+
+    #1. parsing arguments
+    try:
+        args = json.loads(raw_arguments) if raw_arguments else {}
+        if not isinstance(args, dict):
+            #catch type error: valid json syntax but not parsed into a dictionary
+            return "Error: arguments must be a valid JSON object", True
+    except Exception:
+        #catch syntax error
+        return "Error:Arguments are not valid JSON", True
+
+    #2. Check tool name exists
+    tool_function = DISPATCH.get(name)
+    if not tool_function:
+        return f"Error: tool {name} does not exist", True
+
+    #3. Execute inside try/catch, to catch exceptions so they are readable feedback instead of crashing the run.
+    #Strip the tracebacks to avoid leaking local file paths.
+    try:
+        result = tool_function(**args)
+        is_error = False
+    except Exception as e:
+        return f"Error executing {name}: {str(e)}", True
+
+    # 4. Cap output size in characters
+    #ensure res_str is string regardless of data type the tool returned
+    res_str = json.dumps(result) if not isinstance(result, str) else result
+    if len(res_str) > MAX_RESULT_CHARS:
+        #limiting the res character length. return cut off version if too long
+        res_str = res_str[:MAX_RESULT_CHARS] + "... [was truncated]"
+
+    return res_str, is_error
 
 
 # --------------------------------------------------------------------------
