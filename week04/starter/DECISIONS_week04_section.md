@@ -6,34 +6,34 @@ Copy this into your `DECISIONS.md` and fill it in.
 
 ## Week 4
 
-**Run conditions.** agent model: [ ] | temperature: 0.0 | step cap: [ ] |
-budget: [ ] | stall limit: [ ] | served locally | date: [YYYY-MM-DD] |
-scored on: [the recording / my own machine]
+**Run conditions.** agent model: qwen2.5:7b | temperature: 0.0 | step cap: 6 |
+budget: none (managed through step cap) | stall limit: 2 | served locally | date: 2026-10-13 |
+scored on: my own machine
 
 ### 1. The two tool descriptions
 
 | tool | what its "do not use this for" clause prevents |
-| search_services | |
-| compute | |
+| search_services | Prevents the model from looking up arithmetic expressions, translation or personal reference. |
+| compute | Prevents passing units, currency symbols or any language into the tool and prevents the model from doing the math itself |
 
 ### 2. The three caps
 
 | cap | value | why that value |
-| steps | | |
-| budget | | |
-| no progress | | |
+| steps | 6 | If we go even lower, most our requests will not be completed in the limited count, if we go higher it will take too long and be expensive |
+| budget | none | Because the token budget is undirectly bounded by step count and context_budget.  |
+| no progress | 2 | Allows one retry but terminates on the second no progress to avoid a loop |
 
-My definition of progress is [ ], and it does **not** fire when [ ].
+My definition of progress is accessing new document IDs that were not previously seen in the session, and it does **not** fire when there is only one stall..
 
 ### 3. Task accuracy
 
-[ ]/10 passed. Failed: [ids].
+4/10 passed. Failed: 'T-01', 'T-03', 'T-04', 'T-05', 'T-07', 'T-09'.
 
-Steps: min [ ], max [ ], mean [ ]. Caps fired: [ ].
+Steps: min 1, max 2, mean 1.6. Caps fired: 0.
 
 ### 4. What the tools bought
 
-No-tool baseline: [ ]/10. With tools: [ ]/10.
+No-tool baseline: 1/10. With tools: 4/10.
 
 One sentence on what the tools bought, and at what cost per task:
 

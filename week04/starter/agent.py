@@ -224,7 +224,121 @@ def run_task(client, task, model: str = LARGE.name,
     depends on a model's judgment, which is not a property you can promise
     anybody.
     """
-    raise NotImplementedError("TODO 2, 3, 4: the loop and its caps")
+    t0 = time.perf_counter()
+    run = Run(task_id=task.id)
+    seen_docs: set[str] = set()
+    consecutive_stalls = 0
+
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": task.question},
+    ]
+
+    recorder = TraceRecorder(
+        week=week,
+        case_id=task.id,
+        conditions=local_conditions(model),
+        user_input=task.question,
+    )
+
+    while True:
+        # to do 3: Step cap
+        if run.steps >= max_steps:
+            run.cap_fired = "step_limit"
+            run.answer = _partial(run, "Exceeded max allowed steps")
+            break
+
+        run.steps += 1
+
+        # Model turn
+        with recorder.step("model", model) as s:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                tools=SCHEMAS,
+                temperature=0.0,
+            )
+            if response.usage:
+                run.tokens += response.usage.total_tokens
+                s.tokens(
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                )
+
+        choice = response.choices[0]
+        message = choice.message
+
+        # to do 3 model returned an answer without using a tool
+        if not message.tool_calls:
+            run.answer = message.content or ""
+            break
+
+        # Logging the model demand for the tool
+        if hasattr(message, "model_dump"):
+            messages.append(message.model_dump(exclude_unset=True))
+        elif hasattr(message, "to_dict"):
+             messages.append(message.to_dict())
+        else:
+            messages.append(message)
+
+        search_called = False
+        new_docs_this_turn = 0
+
+        # Run all tools called this turn
+        for tc in message.tool_calls:
+            name = tc.function.name
+            raw_args = tc.function.arguments
+            run.tool_calls.append(name)
+
+            with recorder.step("tool", name) as s:
+                s.detail(arguments=raw_args)
+                res_str, is_error = run_tool_call(name, raw_args)
+
+                if is_error:
+                    run.tool_errors += 1
+                    s.failed(res_str)
+
+                if INJECTION_MARKER in res_str:
+                    run.saw_injection = True
+
+                if name == "search_services":
+                    search_called = True
+                    found_ids = set(_doc_ids(res_str))
+                    new_ids = found_ids - seen_docs
+                    new_docs_this_turn += len(new_ids)
+                    seen_docs.update(found_ids)
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": res_str,
+                }
+            )
+
+        # to do 4: Stall detection evaluated per turn
+        if search_called:
+            if new_docs_this_turn == 0:
+                consecutive_stalls += 1
+            else:
+                consecutive_stalls = 0
+
+        if consecutive_stalls >= stall_limit:
+            run.cap_fired = "no_progress"
+            run.answer = _partial(
+                run,
+                "Stall limit reached: Stopped due to repeated searches with no new documents found",
+            )
+            break
+
+    # Finalize and persist trace outside the loop
+    run.seconds = time.perf_counter() - t0
+    outcome = "degraded" if run.cap_fired else "ok"
+    recorder.finish(
+        output=run.answer,
+        outcome=outcome,
+    )
+    return run
 
 
 def _partial(run: Run, reason: str) -> str:
