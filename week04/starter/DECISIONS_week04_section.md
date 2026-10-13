@@ -37,7 +37,7 @@ No-tool baseline: 1/10. With tools: 4/10.
 
 One sentence on what the tools bought, and at what cost per task:
 
-[...]
+Tools increased task accuracy, at the cost of more than 4 times the tokens.
 
 ### 5. The four findings
 

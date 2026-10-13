@@ -185,7 +185,8 @@ def run_tool_call(name: str, raw_arguments: str) -> tuple[Any, bool]:
 
 def run_task(client, task, model: str = LARGE.name,
              max_steps: int = 6, stall_limit: int = 2,
-             system: str = SYSTEM, week: int = 4) -> Run:
+             system: str = SYSTEM, week: int = 4,
+             tools: list[dict[str, Any]] | None = SCHEMAS) -> Run:
     """TODO 2, 3, 4. The whole agent: a while loop with three exits.
 
     Build it in this order, and run it after each one.
@@ -252,12 +253,15 @@ def run_task(client, task, model: str = LARGE.name,
 
         # Model turn
         with recorder.step("model", model) as s:
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                tools=SCHEMAS,
-                temperature=0.0,
-            )
+            create_kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.0,
+            }
+            if tools:
+                create_kwargs["tools"] = tools
+
+            response = client.chat.completions.create(**create_kwargs)
             if response.usage:
                 run.tokens += response.usage.total_tokens
                 s.tokens(

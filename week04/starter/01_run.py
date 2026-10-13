@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import argparse
 
-from agent import SYSTEM, run_task
+from agent import SYSTEM, run_task, SCHEMAS
 from scoring import report, score_all
 from tasks import TASKS
 
@@ -47,8 +47,8 @@ def main() -> int:
     args = ap.parse_args()
 
     client = get_client(args.replay)
-
-    runs = [run_task(client, t, model=args.model, max_steps=args.max_steps)
+    active_tools = [] if args.no_tools else SCHEMAS
+    runs = [run_task(client, t, model=args.model, max_steps=args.max_steps, tools=active_tools)
             for t in TASKS]
     board = score_all(TASKS, runs)
     print(report(board, runs))
