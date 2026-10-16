@@ -54,7 +54,6 @@ def variant_model(client) -> None:
     #iterate through both models small and large
     for m in (SMALL, LARGE):
         routed_list= [] #init empty list that store final routing models for this model
-
         #iterating through queries
         for q in QUERIES:
             #call router to get a classification decision and metadata
