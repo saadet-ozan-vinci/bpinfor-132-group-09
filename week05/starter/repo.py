@@ -100,11 +100,20 @@ def apply_fix(work: Work, path: str, old_line: str, new_line: str) -> str:
     This function. That distinction is the whole of week 4's block 3 and it
     returns in week 11 as the difference between a guardrail and a request.
     """
-    if path.startswith("tests/") or "/tests/" in path or path.endswith(
-            "run_tests.py"):
+    path_parts = path.replace("\\", "/").casefold().split("/")
+    if "tests" in path_parts or path_parts[-1] == "run_tests.py":
         return "REFUSED: test files are not editable."
-    target = work.root / path
-    if not target.exists():
+    root = work.root.resolve()
+    target = (root / path).resolve()
+    try:
+        relative_target = target.relative_to(root)
+    except ValueError:
+        return "REFUSED: path must stay inside the scratch repository."
+    resolved_parts = [part.casefold() for part in relative_target.parts]
+    if "tests" in resolved_parts or relative_target.name.casefold() == \
+            "run_tests.py":
+        return "REFUSED: test files are not editable."
+    if not target.is_file():
         return f"REFUSED: no such file: {path}"
     text = target.read_text(encoding="utf-8")
     if old_line not in text:

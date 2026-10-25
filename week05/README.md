@@ -73,6 +73,109 @@ after that is meaningless.
 One variable changes across them: how much architecture sits between the
 model and the edit.
 
+## A beginner's guide to the code
+
+The code for the three agents is in `starter/agents.py`; the experiment
+runner is `starter/01_compare.py`; and the copied project, test runner, and
+safe line-edit function are in `starter/repo.py`.
+
+### A few library words in plain English
+
+**Pydantic** checks that data has the shape your Python code expects. For
+example, a planner response must have a goal, a list of steps, and a file
+name. `BaseModel` declares that shape, and `Field` adds constraints or
+instructions to individual fields.
+
+**Pydantic AI** connects a model to your program. An `Agent` holds the model,
+instructions, and expected response type. Calling `await agent.run(...)`
+sends a request and waits for the response. If the expected response type is
+set, Pydantic AI checks that response before returning it.
+
+A **tool** is a Python function the model is allowed to request. In
+architecture A, the baseline agent can list files, read a file, request a
+line replacement, and run tests. Python runs each tool; the model does not
+directly reach into the file system.
+
+`RunContext[Work]` gives a tool access to the Python-side `Work` object for
+the current temporary repository copy. `async` and `await` are Python's way
+of waiting for a model response without blocking the whole asynchronous
+program.
+
+### How one planned attempt works
+
+1. `Work.fresh()` copies the toy repository into a new temporary directory.
+   Each attempt gets its own copy so an earlier fix cannot affect later
+   measurements.
+2. In architectures B and C, the planner returns a `Plan`. Pydantic checks
+   the response shape; `validate_plan` then applies additional rules such as
+   whether the file is known and the plan includes running tests.
+3. If the plan fails those rules, this experiment prints the problems and
+   follows its chosen fallback policy: it continues with `discounts.py`.
+   This is a policy choice for the experiment, not a feature supplied by
+   Pydantic.
+4. The fixer receives the selected source file, the failing test output, and
+   the task. It returns a `Fix` proposal containing the file, the exact old
+   line, the replacement line, and a short reason. The fixer does not write
+   the change itself.
+5. In architecture C, a separate reviewer receives the proposed diff and
+   failing test output and returns `approve` or `reject`. A rejection blocks
+   the edit.
+6. `apply_fix` checks the path and old line before editing the temporary
+   copy. It refuses test files, paths outside the copy, missing files,
+   missing lines, and ambiguous lines. These checks are performed by Python;
+   they do not depend on the model following its instructions.
+7. The test suite runs on the resulting copy. That test result, not the
+   planner's confidence or the reviewer's approval, determines whether the
+   row is green.
+8. The attempt's measurements are saved, and its temporary copy is removed.
+
+### Understanding the model response types
+
+The `Plan`, `Fix`, and `Verdict` classes in `agents.py` inherit from
+Pydantic's `BaseModel`. Think of them as forms with named fields:
+
+| Type | Fields | Purpose |
+| --- | --- | --- |
+| `Plan` | `goal`, `steps`, `suspect_file` | A proposed sequence of work |
+| `Fix` | `path`, `old_line`, `new_line`, `why` | One proposed source-line replacement |
+| `Verdict` | `decision`, `reason` | The reviewer's approval or rejection |
+
+For example, `Literal["approve", "reject"]` means the decision must be one of
+those two exact strings. The `Fix` line fields also disallow newline
+characters: this keeps a one-line proposal from accidentally becoming a
+whole function or file. These checks can reject malformed answers, but they
+cannot prove that a syntactically valid answer is a correct fix. The tests
+and the edit guard provide separate checks.
+
+The `UnexpectedModelBehavior` import in `agents.py` is used to catch one
+specific failure: Pydantic AI could not get a valid structured `Fix` from
+the model within the existing retry limit. The program records that as a
+failed proposal so the remaining experiment attempts can continue. This
+does not change the retry count or turn the failed response into a
+successful fix.
+
+### Reading the comparison
+
+`--runs 3` runs each architecture three times. The model may give different
+answers on different attempts, so the results are evidence from a small
+experiment rather than a guarantee about all tasks or models.
+
+* **green** means the toy repository's test suite passed after that attempt.
+* **tokens** is the model usage reported by Pydantic AI; more agent steps
+  usually mean more model work.
+* **seconds** is elapsed time for the attempt.
+* **reviewer=approve** only means the reviewer approved the proposal. The
+  edit can still be refused by `apply_fix`, and the tests can still fail.
+* A plan warning is recorded separately. Under this experiment's policy, an
+  invalid plan falls back to the known `discounts.py` file rather than
+  stopping the attempt.
+
+The program writes detailed rows to
+`artifacts/week05_architectures.json` and records trace entries separately.
+Always distinguish results from your own live run from the supplied replay
+recording. Use the live measurements and your own reasoning when completing
+your decisions document.
+
 ## Block 1, plan and fix (35 minutes)
 
 TODO 1 to 4 in `agents.py`.

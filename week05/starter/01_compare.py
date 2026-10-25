@@ -1,4 +1,4 @@
-"""Blocks 1 to 3. Three architectures on the same task. TODO 6 and 7.
+"""Run and compare the three Week 5 agent architectures.
 
     python 01_compare.py --replay
     python 01_compare.py --runs 3
@@ -11,17 +11,34 @@ architecture sits between the model and the edit.
   C  B + reviewer      the same, with a second agent gating the proposal
 
 The written answers are at the bottom.
+
+Run this file from the starter directory:
+
+    python 01_compare.py --runs 3
+
+``--runs 3`` repeats each architecture three times. Model responses can vary,
+so one run is not enough to compare them. Use ``--replay`` to read the
+recorded reference outcomes instead of contacting the model.
+
+Each attempt gets its own temporary copy of the toy repository. The summary
+reports whether its tests passed (``green``), how many model tokens were
+used, and how many seconds it took. It also saves detailed outcomes to the
+project artifacts. The temporary copies are removed after each attempt.
 """
 
 from __future__ import annotations
 
-import argparse
-import asyncio
-import time
+import argparse  # Reads options such as --runs and --replay from the command.
+import asyncio  # Starts the asynchronous agent calls from this script.
+import time  # Measures elapsed time for each attempt.
 
+# The agents module owns the model instructions and proposal/review logic.
 from agents import Verdict, baseline, propose, reviewer, validate_plan
+# The repository module owns isolated work copies, tests, and guarded edits.
 from repo import Work, apply_fix, diff_summary, run_tests
 
+# These project helpers validate/generate gold-set data, load fixtures,
+# record traces, and write JSON artifacts.
 from project.contracts import GoldCase, GoldSet
 from project.fixtures import load_or_reference
 from project.trace import TraceRecorder, local_conditions, write_json
@@ -35,6 +52,13 @@ TASK = ("A test is failing. The off-peak discount is meant to apply to "
 
 
 def record(arch: str, run_index: int, outcome: str, **notes) -> None:
+    """Write one attempt's outcome to the shared trace log.
+
+    ``**notes`` means this function accepts named details such as ``green``,
+    ``tokens``, and ``fix`` without requiring a separate parameter for each.
+    The trace is evidence for later analysis; it does not decide whether a
+    proposed code change is correct.
+    """
     rec = TraceRecorder(
         week=5, case_id=f"{arch}-run{run_index}",
         conditions=local_conditions("qwen2.5:7b", temperature=0.0,
@@ -47,6 +71,7 @@ def record(arch: str, run_index: int, outcome: str, **notes) -> None:
 
 
 async def run_baseline(index: int) -> dict:
+    """Run architecture A on a clean copy, then measure its test result."""
     work = Work.fresh()
     t0 = time.perf_counter()
     calls = 0
@@ -68,41 +93,85 @@ async def run_baseline(index: int) -> dict:
 
 
 async def run_planned(index: int, with_reviewer: bool) -> dict:
+    """Run architecture B or C on a clean copy.
+
+    B uses the plan and fixer only. C also asks the reviewer to approve or
+    reject the proposed diff. A rejection is a hard veto: ``apply_fix`` is
+    not called. Regardless of what the model says, the tests are run on the
+    resulting copy and are the final green/red measurement.
+    """
     work = Work.fresh()
     t0 = time.perf_counter()
-    out = await propose(work, TASK, use_plan=True)
-    fix = out["fix"]
+    try:
+        out = await propose(work, TASK, use_plan=True)
+        fix = out.get("fix")
+        verdict = None
+        applied = "not attempted"
+        fix_summary = None
 
-    verdict = None
-    if with_reviewer:
-        diff = diff_summary(work, fix.path, fix.old_line, fix.new_line)
-        failing = run_tests(work).output
-        r = await reviewer.run(f"Proposed change:\n{diff}\n\n"
-                               f"Failing test output:\n{failing}")
-        verdict = r.output
-        out["tokens"] += r.usage.total_tokens or 0
+        if fix is not None:
+            fix_summary = (
+                f"{fix.path}: {fix.old_line.strip()} -> "
+                f"{fix.new_line.strip()}"
+            )
+            if with_reviewer:
+                # Give the reviewer the proposed diff and failing tests, not
+                # the fixer's private reasoning, so this is a separate review.
+                diff = diff_summary(
+                    work, fix.path, fix.old_line, fix.new_line)
+                failing = run_tests(work).output
+                r = await reviewer.run(
+                    f"Proposed change:\n{diff}\n\n"
+                    f"Failing test output:\n{failing}"
+                )
+                verdict = r.output
+                out["tokens"] += r.usage.total_tokens or 0
 
-    applied = "not attempted"
-    if verdict is None or verdict.decision == "approve":
-        applied = apply_fix(work, fix.path, fix.old_line, fix.new_line)
-    green = run_tests(work).passed
+            approved = (
+                not with_reviewer
+                or (verdict is not None and verdict.decision == "approve")
+            )
+            if approved:
+                # Even an approved proposal must pass apply_fix's deterministic
+                # path, test-file, and exact-line checks before it is written.
+                applied = apply_fix(
+                    work, fix.path, fix.old_line, fix.new_line)
+            else:
+                applied = "BLOCKED: reviewer did not approve the proposal."
 
-    row = {"architecture": "C planner+reviewer" if with_reviewer
-           else "B planner", "green": green,
-           "plan_ok": out["plan_ok"], "plan_problems": out["plan_problems"],
-           "applied": applied,
-           "verdict": verdict.decision if verdict else None,
-           "verdict_reason": verdict.reason if verdict else None,
-           "fix": f"{fix.path}: {fix.old_line.strip()} -> "
-                  f"{fix.new_line.strip()}",
-           "tokens": out["tokens"],
-           "seconds": round(time.perf_counter() - t0, 1)}
-    record(row["architecture"], index, "ok" if green else "error", **row)
-    work.cleanup()
-    return row
+        # The test suite is the experiment's objective check. Reviewer
+        # approval by itself does not make the run green.
+        green = run_tests(work).passed
+        row = {
+            "architecture": "C planner+reviewer" if with_reviewer
+            else "B planner",
+            "green": green,
+            "plan_ok": out.get("plan_ok"),
+            "plan_problems": out.get("plan_problems", []),
+            "applied": applied,
+            "verdict": verdict.decision if verdict else None,
+            "verdict_reason": verdict.reason if verdict else None,
+            "fix": fix_summary,
+            "fix_error": out.get("fix_error"),
+            "tokens": out["tokens"],
+            "seconds": round(time.perf_counter() - t0, 1),
+        }
+        record(row["architecture"], index,
+               "ok" if green else "error", **row)
+        if row["fix_error"]:
+            print(
+                f"    {row['architecture']} run {index} failed: "
+                f"{row['fix_error']}"
+            )
+        return row
+    finally:
+        # Runs must not share edited files; remove this run's isolated copy
+        # even if the model or reviewer raises an exception.
+        work.cleanup()
 
 
 async def main_async(runs: int) -> list[dict]:
+    """Run A, B, and C once per repetition and collect their result rows."""
     rows = []
     for i in range(1, runs + 1):
         rows.append(await run_baseline(i))
@@ -112,6 +181,7 @@ async def main_async(runs: int) -> list[dict]:
 
 
 def main() -> int:
+    """Parse options, run or replay the comparison, and write its artifacts."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--replay", action="store_true",
@@ -149,9 +219,18 @@ def main() -> int:
             flag = "green" if row["green"] else "RED  "
             v = f"  reviewer={row['verdict']}" if row.get("verdict") else ""
             print(f"  [{flag}] {row['architecture']:<20} {row['fix'][:64]}{v}")
+        elif row.get("fix_error"):
+            print(
+                f"  [RED  ] {row['architecture']:<20} "
+                "no valid proposal was produced"
+            )
+        if row.get("fix_error"):
+            print(f"      proposal error: {row['fix_error']}")
 
     write_json("artifacts/week05_architectures.json", {"rows": rows})
 
+    # The gold set stores examples for later evaluation exercises. Adding
+    # these cases is separate from whether this run's fix passes the tests.
     # TODO 7. Two cases enter the gold set.
     #
     #   The first is the fix you expect. The second is the one that matters:

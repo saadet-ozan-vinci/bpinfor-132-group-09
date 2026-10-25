@@ -113,3 +113,6 @@ project.
   of defect the test suite does not cover. Here is the defect."
 
 Every one of these is stronger than a diagram.
+
+ what i chose:
+ invalid plans warn and proceed via the fallback file; the reviewer has a hard veto; and the existing retry limits stay for comparability
