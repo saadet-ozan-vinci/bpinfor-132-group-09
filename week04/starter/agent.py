@@ -152,9 +152,9 @@ def run_tool_call(name: str, raw_arguments: str) -> tuple[Any, bool]:
         if not isinstance(args, dict):
             #catch type error: valid json syntax but not parsed into a dictionary
             return "Error: arguments must be a valid JSON object", True
-    except Exception:
+    except json.JSONDecodeError:
         #catch syntax error
-        return "Error:Arguments are not valid JSON", True
+        return "Error: arguments are not valid JSON", True
 
     #2. Check tool name exists
     tool_function = DISPATCH.get(name)
@@ -166,15 +166,19 @@ def run_tool_call(name: str, raw_arguments: str) -> tuple[Any, bool]:
     try:
         result = tool_function(**args)
         is_error = False
-    except Exception as e:
-        return f"Error executing {name}: {str(e)}", True
+    except Exception as exc:
+        return (
+            f"Error: {name} failed ({type(exc).__name__}); "
+            "check the arguments and try a supported request.",
+            True,
+        )
 
     # 4. Cap output size in characters
     #ensure res_str is string regardless of data type the tool returned
     res_str = json.dumps(result) if not isinstance(result, str) else result
     if len(res_str) > MAX_RESULT_CHARS:
-        #limiting the res character length. return cut off version if too long
-        res_str = res_str[:MAX_RESULT_CHARS] + "... [was truncated]"
+        marker = "... [truncated]"
+        res_str = res_str[:MAX_RESULT_CHARS - len(marker)] + marker
 
     return res_str, is_error
 
@@ -225,6 +229,11 @@ def run_task(client, task, model: str = LARGE.name,
     depends on a model's judgment, which is not a property you can promise
     anybody.
     """
+    if max_steps < 1:
+        raise ValueError("max_steps must be at least 1")
+    if stall_limit < 1:
+        raise ValueError("stall_limit must be at least 1")
+
     t0 = time.perf_counter()
     run = Run(task_id=task.id)
     seen_docs: set[str] = set()
@@ -238,7 +247,13 @@ def run_task(client, task, model: str = LARGE.name,
     recorder = TraceRecorder(
         week=week,
         case_id=task.id,
-        conditions=local_conditions(model),
+        conditions=local_conditions(
+            model,
+            temperature=0.0,
+            max_steps=max_steps,
+            stall_limit=stall_limit,
+            tools_enabled=bool(tools),
+        ),
         user_input=task.question,
     )
 
@@ -341,6 +356,10 @@ def run_task(client, task, model: str = LARGE.name,
     recorder.finish(
         output=run.answer,
         outcome=outcome,
+        cap_fired=run.cap_fired,
+        tool_calls=run.tool_calls,
+        tool_errors=run.tool_errors,
+        saw_injection=run.saw_injection,
     )
     return run
 

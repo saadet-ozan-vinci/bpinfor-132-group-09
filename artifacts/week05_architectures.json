@@ -1,0 +1,103 @@
+{
+  "rows": [
+    {
+      "architecture": "A baseline",
+      "green": false,
+      "tool_calls": 6,
+      "tokens": 4464,
+      "seconds": 88.7
+    },
+    {
+      "architecture": "B planner",
+      "green": true,
+      "plan_ok": false,
+      "plan_problems": [
+        "Suspect file bookings.py is not in known files."
+      ],
+      "applied": "applied",
+      "verdict": null,
+      "verdict_reason": null,
+      "fix": "discounts.py: return start_hour > OFF_PEAK_FROM_HOUR -> return start_hour >= OFF_PEAK_FROM_HOUR",
+      "tokens": 1756,
+      "seconds": 63.0
+    },
+    {
+      "architecture": "C planner+reviewer",
+      "green": false,
+      "plan_ok": false,
+      "plan_problems": [
+        "Suspect file booking_logic.py is not in known files."
+      ],
+      "applied": "not attempted",
+      "verdict": "reject",
+      "verdict_reason": "Changes the logic without fixing the bug.",
+      "fix": "booking_logic.py: return start_hour > OFF_PEAK_FROM_HOUR -> return start_hour >= OFF_PEAK_FROM_HOUR",
+      "tokens": 2306,
+      "seconds": 58.2
+    },
+    {
+      "architecture": "A baseline",
+      "green": true,
+      "tool_calls": 12,
+      "tokens": 7498,
+      "seconds": 106.3
+    },
+    {
+      "architecture": "B planner",
+      "green": true,
+      "plan_ok": true,
+      "plan_problems": [],
+      "applied": "applied",
+      "verdict": null,
+      "verdict_reason": null,
+      "fix": "discounts.py: return start_hour > OFF_PEAK_FROM_HOUR -> return start_hour >= OFF_PEAK_FROM_HOUR",
+      "tokens": 1779,
+      "seconds": 47.2
+    },
+    {
+      "architecture": "C planner+reviewer",
+      "green": true,
+      "plan_ok": true,
+      "plan_problems": [],
+      "applied": "applied",
+      "verdict": "approve",
+      "verdict_reason": "Change fixes the logic to include equal case, matching test expectation.",
+      "fix": "discounts.py: return start_hour > OFF_PEAK_FROM_HOUR -> return start_hour >= OFF_PEAK_FROM_HOUR",
+      "tokens": 2331,
+      "seconds": 60.2
+    },
+    {
+      "architecture": "A baseline",
+      "green": true,
+      "tool_calls": 42,
+      "tokens": 47491,
+      "seconds": 612.2
+    },
+    {
+      "architecture": "B planner",
+      "green": true,
+      "plan_ok": true,
+      "plan_problems": [],
+      "applied": "applied",
+      "verdict": null,
+      "verdict_reason": null,
+      "fix": "discounts.py: return start_hour > OFF_PEAK_FROM_HOUR -> return start_hour >= OFF_PEAK_FROM_HOUR",
+      "tokens": 1754,
+      "seconds": 48.2
+    },
+    {
+      "architecture": "C planner+reviewer",
+      "green": false,
+      "plan_ok": false,
+      "plan_problems": [
+        "Suspect file off_peak_discounts.py is not in known files."
+      ],
+      "applied": "REFUSED: no such file: off_peak_discounts.py",
+      "verdict": "approve",
+      "verdict_reason": "Fixes the condition to match test expectation.",
+      "fix": "off_peak_discounts.py: return start_hour > OFF_PEAK_FROM_HOUR -> return start_hour >= OFF_PEAK_FROM_HOUR",
+      "tokens": 2927,
+      "seconds": 65.6
+    }
+  ]
+}

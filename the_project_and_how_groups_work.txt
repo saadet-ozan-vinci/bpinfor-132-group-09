@@ -1,0 +1,33 @@
+The project, and how groups work
+
+The project is the agentic application you build across the practical sessions from week 1 to week 13, and present in week 14. It is not a separate piece of work bolted on at the end. Every lab is an increment of one system, and the strongest predictor of a good project mark is that you treat it that way from week 1.
+
+It is worth 40 percent of the course.
+Groups
+
+One to three students. Working alone is a legitimate choice and carries no penalty: the grading rubric is the same and the scope expectation scales with group size.
+
+Register your group here on Moodle by Friday 2 October 2026 at 23:59, in week 3. The registration collects the members and the repository URL. Group changes after week 8 need the coordinator's agreement.
+Your repository
+
+You host it wherever you choose, GitHub or GitLab, private or public. The one condition is that the teaching team has access to it from registration until the grades are out.
+
+There is no template repository. You create your own in week 1 and copy the project spine into it once. Use version control from the first session: the commit history is useful evidence of contribution.
+What a group submits
+
+    One code repository and one project report.
+    Plus one short individual report per member, roughly one page, stating your own contribution and your own vision for the project.
+
+The individual report is what allows an individual mark to be given inside a shared deliverable. The shared deliverable sets the baseline for the group, and the individual report and the showcase can move an individual mark up or down from it.
+
+A member who cannot explain the system at the showcase does not receive the group mark. This is stated now rather than applied as a surprise in January.
+Deadlines
+
+The report and code freeze on Friday 11 December 2026 at 23:59, submitted through Moodle. Submit the report as a file and the repository as the URL of a commit the teaching team can reach.
+
+The showcase is in the week 14 practical session, as a live demonstration. Attendance is expected.
+
+There is a mid-semester check-in in the week 8 practical, ten minutes per group, formative and not graded. Treat it as the safety net that it is. Groups that discover in week 13 that their architecture cannot support an evaluation harness have run out of time. Groups that discover it in week 8 have six weeks.
+Practical advice
+
+Split the work by subsystem, not by week. Agree early on who owns the evaluation harness, because it is the part groups postpone and then regret. And the failure mode worth naming out loud is the group of three where one person writes everything. The individual report and the showcase questions are the mechanism that catches it.

@@ -68,8 +68,13 @@ def score_routes(results, queries) -> RouteScore:
     confidence value, and whether the query was one of the ambiguous four.
     """
 
-    s = RouteScore()
+    if len(results) != len(queries):
+        raise ValueError(
+            f"results/queries length mismatch: {len(results)} results for "
+            f"{len(queries)} queries"
+        )
 
+    s = RouteScore()
     for res, q in zip(results, queries):
         result = res.applied_route # considering route that was actually executed
         gold = q.route # real target category

@@ -47,7 +47,15 @@ class ServiceRequest(BaseModel):
         for free, with no model involved. That makes it the most valuable
         field on this schema and the reason it is here.
     """
-    due_date: Optional[date] = None
+    due_date: Optional[date] = Field(
+        default=None,
+        description=(
+            "Return an ISO calendar date when the message states a specific "
+            "date. Return null when it states no date or only a relative "
+            "time such as 'as soon as possible' or 'before the end of the "
+            "month'. Interpret dates as day/month/year when ambiguous."
+        ),
+    )
     quote: str = Field(
         max_length=150,
         description="A short substring copied verbatim character-for-character from the message that supports the urgency decision.",
@@ -67,25 +75,19 @@ class ServiceRequest(BaseModel):
 # TODO 2. Build the messages.
 # --------------------------------------------------------------------------
 
-SYSTEM_ZERO_SHOT = """Your job is to act as the help desk of Remerbaach, a fictional Luxembourg commune,
- in English, French, and German. Four fields out of each. The messages arrive in English, French, or German.
-  The allowed values for category are ["access", "hardware", "billing", "facilities", "other"] and the allowed
-  values for urgency are ["urgent", "standard", "info"]. due_date is nullable, so the absent case has to be specified rather 
-  than discovered. the quote must be copied character for character, not translated"""
+SYSTEM_ZERO_SHOT = """\
+You are a service-desk ticket extractor for the fictional Remerbaach
+commune. Each message is written in English, French, or German. Extract the
+message into the required fields; do not answer the sender.
 
-"""\
-TODO 2a: write the system prompt.
-
-It has to state, in words a model will follow:
-  - what the job is
-  - that messages arrive in English, French, or German
-  - the allowed values for category and for urgency
-  - the due_date convention, including what counts as "no date"
-  - that quote must be copied character for character, not translated
-
-Write the conventions here even though they are also in the schema. The
-schema constrains the shape of the answer. The prompt is what tells the
-model how to decide. Neither one does the other's job.
+Choose category from: access, hardware, billing, facilities, other.
+Choose urgency from: urgent, standard, info.
+For due_date, return an ISO 8601 calendar date (YYYY-MM-DD) only when a
+specific calendar date is stated. Return null when there is no date or only
+a relative expression such as "as soon as possible" or "before the end of
+the month". Interpret ambiguous numeric dates as day/month/year.
+For quote, copy a short supporting span from the original message exactly,
+character for character. Do not translate, paraphrase, or normalize it.
 """
 
 
@@ -101,7 +103,10 @@ def build_messages(system: str, document_text: str) -> list[dict]:
     instruction and the data are in the same place, a document that contains
     an instruction is indistinguishable from your instruction.
     """
-    return [{"role": "system", "content": system}, {"role":"user", "content": document_text}]
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": document_text},
+    ]
 
 
 # --------------------------------------------------------------------------

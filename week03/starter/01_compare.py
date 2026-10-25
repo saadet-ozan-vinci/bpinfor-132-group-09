@@ -56,8 +56,8 @@ def run_monolith(client, model=SMALL.name):
     return metas
 
 
-def run_router(client, model=SMALL.name):
-    """The treatment. Two calls per query, and a policy layer between them."""
+def run_router(client, model=SMALL.name, use_request_extractor: bool = True):
+    """Classify each query, then answer with its specialist or extractor."""
     routed_all, metas_c, metas_a = [], [], []
     for q in QUERIES:
         rec = TraceRecorder(
@@ -78,14 +78,32 @@ def run_router(client, model=SMALL.name):
                         policy_fired=routed.policy_fired,
                         evidence_ok=routed.evidence_ok)
 
-        with rec.step("model", f"{model}:respond") as step:
-            answer, meta_a = respond(
-                client, SPECIALISTS[routed.applied_route], q.text, model)
-            step.tokens(meta_a["prompt_tokens"], meta_a["completion_tokens"])
+        extraction_valid = None
+        if routed.applied_route == "request" and use_request_extractor:
+            with rec.step("model", f"{model}:request-extractor") as step:
+                extracted, meta_a = extract(
+                    client, SYSTEM_ZERO_SHOT, q.text, model=model)
+                extraction_valid = extracted is not None
+                answer = (
+                    extracted.model_dump_json()
+                    if extracted is not None
+                    else meta_a["raw"] or ""
+                )
+                step.tokens(
+                    meta_a["prompt_tokens"], meta_a["completion_tokens"])
+                step.detail(valid=extraction_valid, error=meta_a["error"])
+        else:
+            with rec.step("model", f"{model}:respond") as step:
+                answer, meta_a = respond(
+                    client, SPECIALISTS[routed.applied_route], q.text, model)
+                step.tokens(
+                    meta_a["prompt_tokens"], meta_a["completion_tokens"])
 
-        rec.finish(output=answer, outcome="ok",
+        rec.finish(output=answer,
+                   outcome="error" if extraction_valid is False else "ok",
                    applied_route=routed.applied_route,
-                   policy_fired=routed.policy_fired)
+                   policy_fired=routed.policy_fired,
+                   extraction_valid=extraction_valid)
         routed_all.append(routed)
         metas_c.append(meta_c)
         metas_a.append(meta_a)
@@ -109,7 +127,11 @@ def main() -> int:
     client = get_client(args.replay)
 
     mono_metas = run_monolith(client, args.model)
-    routed, metas_c, metas_a = run_router(client, args.model)
+    if args.replay:
+        print("Replay uses the recorded prose specialist for request routes; "
+              "the fixture has no structured-extractor responses.")
+    routed, metas_c, metas_a = run_router(
+        client, args.model, use_request_extractor=not args.replay)
 
     s = score_routes(routed, QUERIES)
     print(report(s, "router"))

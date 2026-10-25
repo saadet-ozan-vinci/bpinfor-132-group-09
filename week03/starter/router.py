@@ -22,13 +22,13 @@ from project.models import BASE_URL, API_KEY, SMALL
 class Decision(BaseModel):
     route: Literal["request", "info", "status", "complaint", "other"]
     confidence: float = Field(ge=0, le=1)
-    evidence: str = Field(max_length=200)
+    evidence: str = Field(min_length=1, max_length=200)
 
 
 class Routed(BaseModel):
     """What the policy layer decided, and why."""
 
-    decision: Decision
+    decision: Decision | None
     applied_route: str
     policy_fired: str | None = None      # None means the decision stood
     evidence_ok: bool = True
@@ -137,17 +137,16 @@ def apply_policy(decision: Decision | None, text: str) -> Routed:
 
     #check 1: call produced no valid decision => routing to safe default route
     if decision is None:
-        empty_decision = Decision(route= SAFE_DEFAULT, confidence=0.0, evidence="")
         return Routed(
-            decision=empty_decision,
+            decision=None,
             applied_route=SAFE_DEFAULT,
             policy_fired="invalid_decision",
             evidence_ok=False
         )
 
     #check 2: Evidence check, the same check as in week02 does the text contain the extracted as substring
-    evidece_ok = decision.evidence in text
-    if not evidece_ok:
+    evidence_ok = bool(decision.evidence.strip()) and decision.evidence in text
+    if not evidence_ok:
         return Routed(
             decision=decision,
             applied_route=SAFE_DEFAULT,
@@ -161,7 +160,7 @@ def apply_policy(decision: Decision | None, text: str) -> Routed:
             decision=decision,
             applied_route=SAFE_DEFAULT,
             policy_fired="below_threshold",
-            evidence_ok=True,
+            evidence_ok=False,
         )
 
     #decision passed all checks
@@ -169,7 +168,7 @@ def apply_policy(decision: Decision | None, text: str) -> Routed:
         decision=decision,
         applied_route=decision.route,
         policy_fired=None,
-        evidence_ok=True,)
+        evidence_ok=True)
 
 
 # --------------------------------------------------------------------------

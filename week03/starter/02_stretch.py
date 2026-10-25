@@ -13,7 +13,7 @@ import collections
 import time
 
 from queries import QUERIES
-from router import apply_policy, classify
+from router import Decision, apply_policy, classify
 from scoring import report, score_routes
 
 from project.models import LARGE, SMALL
@@ -54,10 +54,12 @@ def variant_model(client) -> None:
     #iterate through both models small and large
     for m in (SMALL, LARGE):
         routed_list= [] #init empty list that store final routing models for this model
+        metas = []
         #iterating through queries
         for q in QUERIES:
             #call router to get a classification decision and metadata
             decisions, meta = classify(client, q.text , model = m.name)
+            metas.append(meta)
             #pass recieved decision to the policy layer (confidence, evidence check, fallback)
             routed = apply_policy(decisions, q.text)
             #add to routed list with results
@@ -68,8 +70,19 @@ def variant_model(client) -> None:
         print(report(s, m.name))
 
         #get resident memory from models
-        mem = mem = m.resident_gb
+        mem = m.resident_gb
         print(f"Resident memory: {mem} GB")
+        if s.confidences:
+            print(
+                f"Classifier evidence verified: {s.evidence_ok}/{s.total}; "
+                f"confidence min {min(s.confidences):.2f}, "
+                f"max {max(s.confidences):.2f}, "
+                f"distinct {len(set(s.confidences))}"
+            )
+        print(
+            f"Classifier tokens: "
+            f"{sum(x['prompt_tokens'] + x['completion_tokens'] for x in metas)}"
+        )
 
 
 def variant_voting(client, k: int = 3) -> None:
@@ -87,7 +100,54 @@ def variant_voting(client, k: int = 3) -> None:
     that was already the cheap one, so as a way to decide it is a poor buy.
     As a way to detect something, it may be a very good one.
     """
-    raise NotImplementedError("TODO 8: variant B, voting")
+    if k < 1 or k % 2 == 0:
+        raise ValueError("k must be a positive odd number")
+
+    voted_results = []
+    disagreements = []
+    total_tokens = 0
+    for query in QUERIES:
+        ballot: list[str | None] = []
+        decisions: list[Decision | None] = []
+        for _ in range(k):
+            decision, meta = classify(
+                client, query.text, model=SMALL.name, temperature=0.7)
+            decisions.append(decision)
+            ballot.append(decision.route if decision is not None else None)
+            total_tokens += meta["prompt_tokens"] + meta["completion_tokens"]
+
+        if len(set(ballot)) > 1:
+            disagreements.append({
+                "query_id": query.id,
+                "votes": ballot,
+            })
+
+        counts = collections.Counter(ballot)
+        winning_count = max(counts.values())
+        winning_route = next(
+            route for route in ballot if counts[route] == winning_count)
+        if winning_route is None:
+            winning_decision = None
+        else:
+            winning_decisions = [
+                decision for decision in decisions
+                if decision is not None and decision.route == winning_route
+            ]
+            representative = winning_decisions[0]
+            average_confidence = sum(
+                decision.confidence for decision in winning_decisions
+            ) / len(winning_decisions)
+            winning_decision = representative.model_copy(
+                update={"confidence": average_confidence})
+
+        voted_results.append(apply_policy(winning_decision, query.text))
+
+    scoreboard = score_routes(voted_results, QUERIES)
+    print(report(scoreboard, "majority vote"))
+    ambiguous_ids = [query.id for query in QUERIES if query.ambiguous]
+    print(f"disagreement queries ({len(disagreements)}): {disagreements}")
+    print(f"ambiguous query ids: {ambiguous_ids}")
+    print(f"classifier tokens across {len(QUERIES) * k} calls: {total_tokens}")
 
 
 def main() -> int:

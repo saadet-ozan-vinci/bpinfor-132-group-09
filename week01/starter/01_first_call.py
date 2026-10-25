@@ -44,10 +44,10 @@ def main() -> int:
         #     max_tokens=200
         #   Assign the result to `reply`.
         reply = client.chat.completions.create(
-            model= SMALL.name,
+            model=SMALL.name,
             messages=[{"role": "user", "content": QUESTION}],
             temperature=0.0,
-            max_tokens=200
+            max_tokens=200,
         )
 
         elapsed = time.perf_counter() - started
@@ -74,11 +74,12 @@ def main() -> int:
     #      Which part of it would a user actually feel?
     #
     answer_text = reply.choices[0].message.content
-    print("\n--- TODO 2: print the four things here ---\n")
+    print("\n--- first call ---\n")
     print("answer text:", answer_text)
     print("finish reason:", reply.choices[0].finish_reason)
-    print("prompt tokens:", reply.usage.prompt_tokens, "| reply tokens:", reply.usage.completion_tokens)
-    print("secods elapsed:", time.perf_counter() - started )
+    print("prompt tokens:", reply.usage.prompt_tokens,
+          "| completion tokens:", reply.usage.completion_tokens)
+    print(f"elapsed: {elapsed:.3f}s")
 
     # TODO 3. Close the trace.
     #   Call rec.finish(...) with:

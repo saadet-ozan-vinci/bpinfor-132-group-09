@@ -21,8 +21,7 @@ import time
 
 from openai import OpenAI
 
-import project.prices
-from project.models import BASE_URL, API_KEY, LARGE, SMALL
+from project.models import BASE_URL, API_KEY, SMALL
 from project.prices import PRICE_DATE, estimate, local_cost_note
 from project.trace import write_json
 
@@ -71,14 +70,42 @@ def main() -> int:
     #
     #   Record both. The first includes loading several gigabytes from disk,
     #   the second does not.
-    subprocess.run(["ollama", "stop", SMALL.name]) #releasing model from RAM to do a cold start
+    stop_result = subprocess.run(
+        ["ollama", "stop", SMALL.name],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if stop_result.returncode != 0:
+        message = (stop_result.stderr or stop_result.stdout).strip()
+        raise RuntimeError(
+            f"Could not stop {SMALL.name!r} before the cold-start test: "
+            f"{message or f'ollama exited with status {stop_result.returncode}'}"
+        )
 
-    cold_call_time = timed(client, SHORT, SMALL.name)[1]
-    warm_call_time = timed(client, SHORT, SMALL.name)[1]
+    cold_reply, cold_call_time = timed(client, SHORT, SMALL.name)
+    warm_reply, warm_call_time = timed(client, SHORT, SMALL.name)
 
-    print(f"Cold call time: {cold_call_time:.2f}")
-    print(f"Warm call time: {warm_call_time:.2f}")
-    print(f"Ratio: {cold_call_time/warm_call_time:.2f}")
+    rows.extend([
+        {
+            "case": "cold",
+            "model": SMALL.name,
+            "seconds": round(cold_call_time, 3),
+            "prompt_tokens": cold_reply.usage.prompt_tokens,
+            "completion_tokens": cold_reply.usage.completion_tokens,
+        },
+        {
+            "case": "warm",
+            "model": SMALL.name,
+            "seconds": round(warm_call_time, 3),
+            "prompt_tokens": warm_reply.usage.prompt_tokens,
+            "completion_tokens": warm_reply.usage.completion_tokens,
+        },
+    ])
+
+    print(f"Cold call time: {cold_call_time:.2f}s")
+    print(f"Warm call time: {warm_call_time:.2f}s")
+    print(f"Ratio: {cold_call_time / max(warm_call_time, 1e-9):.2f}")
 
 
 
@@ -104,24 +131,42 @@ def main() -> int:
     #   list is dated {PRICE_DATE}.
 
     long_case = rows[1]
-    total_runs = 200*14*7 #200 cases , 14 weeks, once a day
-    #computing on small tier
-    small_tier = project.prices.estimate(long_case["prompt_tokens"], long_case["completion_tokens"], tier="small" )
-    #computing on large tier
-    large_tier = project.prices.estimate(long_case["prompt_tokens"], long_case["completion_tokens"], tier="large" )
+    runs_per_night = 200
+    nights = 14 * 7
+    estimates = {}
+    for tier in ("small", "large"):
+        per_case = estimate(
+            long_case["prompt_tokens"],
+            long_case["completion_tokens"],
+            tier=tier,
+        )
+        nightly = per_case.total * runs_per_night
+        semester = nightly * nights
+        estimates[tier] = {
+            "per_case_eur": per_case.total,
+            "nightly_eur": nightly,
+            "semester_eur": semester,
+        }
+        print(
+            f"{tier.title()} tier estimate: "
+            f"€{nightly:.2f} per night; €{semester:.2f} over "
+            f"{nights} nightly runs (price list {PRICE_DATE})"
+        )
 
-    cost_small = (small_tier.input_cost + small_tier.output_cost)
-    cost_large = (large_tier.input_cost + large_tier.output_cost)
 
-    print(f"Small tier nightly: €{cost_small*200:.2f}")
-    print(f"Large tier nightly: €{cost_large*200:.2f}")
-
-    print(f"Small tier semester: €{cost_small* total_runs:.2f}")
-    print(f"Large tier semester: €{cost_large* total_runs:.2f}")
-
-
-    write_json("artifacts/week01_cost.json",
-               {"rows": rows, "price_list_date": PRICE_DATE})
+    write_json("artifacts/week01_cost.json", {
+        "rows": rows,
+        "price_list_date": PRICE_DATE,
+        "evaluation_estimates": {
+            "cases_per_night": runs_per_night,
+            "nights": nights,
+            "assumed_case_tokens": {
+                "input": long_case["prompt_tokens"],
+                "output": long_case["completion_tokens"],
+            },
+            "tiers": estimates,
+        },
+    })
     print(local_cost_note())
     return 0
 

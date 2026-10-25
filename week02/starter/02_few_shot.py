@@ -61,7 +61,10 @@ def few_shot_block(n: int = 4) -> str:
     stop copying verbatim, and the field that scored perfectly zero-shot
     will get worse. Look at the recording if you want to see that happen.
     """
-    selected_example_indexes= [0,2,3,4]
+    if not 3 <= n <= 5:
+        raise ValueError("n must be between 3 and 5")
+
+    selected_example_indexes = [0, 2, 3, 4]
     sample_quotes = {
         0: "not blocking me",
         4: "Merci de verifier avant le paiement du 30 septembre 2026",
@@ -84,7 +87,7 @@ def few_shot_block(n: int = 4) -> str:
     return "\n".join(lines)
 
 
-SYSTEM_FEW_SHOT = SYSTEM_ZERO_SHOT + "\n"   # + few_shot_block(), once written
+SYSTEM_FEW_SHOT = SYSTEM_ZERO_SHOT + "\n" + few_shot_block()
 
 
 def main() -> int:
@@ -97,8 +100,7 @@ def main() -> int:
     zero_board, _, zero_metas = run_variant(client, SYSTEM_ZERO_SHOT,
                                             "zero-shot", DOCS, GOLD)
     few_board, _, few_metas = run_variant(
-        client, SYSTEM_ZERO_SHOT + "\n" + few_shot_block(), "few-shot",
-        DOCS, GOLD)
+        client, SYSTEM_FEW_SHOT, "few-shot", DOCS, GOLD)
 
     print(compare(zero_board, few_board, "zero-shot", "few-shot"))
 

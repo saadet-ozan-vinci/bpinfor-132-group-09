@@ -1,0 +1,57 @@
+Project brief
+
+BPINFOR-132, Designing, Verifying, and Shipping AI Agents. Worth 40 percent of the course, graded on the 0 to 20 scale.
+What the project is
+
+The project is the agentic application you build across the practical sessions from week 1 to week 13, and present in week 14. It is not a separate piece of work that starts in December. Every lab is an increment of one system, and by the showcase you have an application that plans, calls tools, retrieves from a corpus, keeps memory, reads an image, is measured by an evaluation harness you wrote, is defended by guardrails you sized, and has been attacked by you on purpose.
+
+What is marked is the reasoning around that system, not the system on its own. A project that runs flawlessly and whose authors cannot say why it is built the way it is scores below a project with a known weakness that its authors have measured, costed, and planned a fix for. This is stated here in week 1 and it is applied in week 14.
+What you submit
+
+Through Moodle, by Friday 11 December 2026 at 23:59.
+
+The repository URL, as a link to a specific commit the teaching team can reach. You host the repository wherever you like, GitHub or GitLab, private or public. The only condition is that the teaching team has access from the week 3 group registration until the grades are out.
+
+The project report, which is DECISIONS.md at the root of that repository, or in docs/, submitted as a file so it is fixed at the deadline. It carries one section per week from 1 to 13, each recording what you decided that week, what you rejected, and what you measured. It is not a diary. A week's section that says what you did but not why you chose it is worth very little.
+
+If you are submitting as a group, one individual report per member, roughly one page, stating what you personally built and what you personally think the project should become. It is what allows an individual mark to be given inside a shared deliverable, so a solo submission does not need one. Write it yourself: it is a statement about you, and letting an assistant write it is a breach of the AI-use policy.
+
+Your repository must also carry the evidence the labs produced, under artifacts/: traces.jsonl, goldset.json, guard_events.jsonl, and findings.json. These are the record of what your system actually did, and they are what an examiner reads before reading your prose.
+Check the floor before you submit
+
+python starter/check_submission.py
+
+The week 14 starter carries this script. It checks facts and not quality, and it separates the two kinds of result. It fails if DECISIONS.md is missing or has no section for some week from 1 to 13, if any of the four artifact files is absent or does not validate against the contract, or if a red-team finding is left with neither a regression test nor an explicit written acceptance. It warns, without failing, if your gold set or your traces cover fewer than three weeks, if findings.json is empty, or if the report never states the model, run date, and temperature its numbers were measured under. Run it with --strict to treat the warnings as failures too, which is the setting worth using on your last commit.
+
+Passing it is the floor, not the bar. It means an examiner can find your evidence. It has no opinion on whether the evidence is any good, and that is what the rubric and the showcase decide.
+The showcase
+
+Tuesday 15 December 2026, in your own practical session. Groupe BICS at 10:15, Groupe BINFO at 14:00. Attendance is expected, and the running order is published on Moodle beforehand.
+
+Each group gets a slot of about six minutes, depending on how many groups there are, and shows four things in this order: one realistic request end to end with cost and latency visible on screen; one guardrail firing, triggered deliberately, with the record it writes; one evaluation number from your own harness, stated with the conditions it was measured under; and one thing that does not work, named by you, with what you would do about it and why that first.
+
+The fourth item earns marks. It does not lose them.
+
+The examiner then asks two questions from this list, choosing the ones your demonstration did not already answer.
+
+    Why this architecture and not the simpler one? Name the alternative you rejected and say what you gave up by rejecting it.
+    Show me the number that says it works, and tell me the conditions it was measured under.
+    What is the worst thing this system can do, and what stops it?
+    If you had one more week, what would you fix first, and why that first?
+
+There is then one follow-up to a member who has not yet spoken: which part did you build, and what did you decide inside it? Every member of a group answers at least one question. Split the four demonstration items across the group rather than electing a presenter.
+
+A member who cannot explain the system does not receive the group mark. This is the mechanism that catches the group of three where one person wrote everything, and it is fairer to say so now than to apply it as a surprise in January.
+Groups and scope
+
+One to three students. Working alone is a legitimate choice and carries no penalty. Register your group on Moodle by Friday 2 October 2026 at 23:59, with your repository URL. Changes after week 8 need the coordinator's agreement.
+
+The rubric is identical whatever the group size. What scales is the scope expected of the system, and it scales roughly with the number of people rather than with the number of features. A solo project is expected to carry the same evidence trail as a group of three, over a narrower application. Breadth does not substitute for evidence: three shallow subsystems score below one subsystem that is measured, guarded, attacked, and understood.
+
+Split the work by subsystem rather than by week, and agree early on who owns the evaluation harness. It is the part groups postpone and then regret, because an architecture that cannot be measured cannot be defended in December and cannot be fixed in the time left.
+Declaring AI assistance
+
+The report carries a short section naming which assistants you used and for what. Using them is expected and encouraged. Omitting the declaration is the problem, not the assistant. Presenting generated output as a measured result is treated as falsified data, and is handled under the university's academic integrity rules rather than by a mark on this rubric.
+How it is marked
+
+See project_rubric.md, which is published alongside this brief. Read it in week 3, before you commit to an architecture, rather than in December.
