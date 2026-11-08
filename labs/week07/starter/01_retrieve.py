@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 from chunking import load_chunks
@@ -27,9 +28,12 @@ K = 5
 
 
 def run_live(size: int = 600, overlap: int = 80) -> list[dict]:
+    index_start = time.perf_counter()
     chunks = load_chunks(size=size, overlap=overlap)
     index = DenseIndex(chunks, name=f"s{size}")
-    print(f"{len(chunks)} chunks, {index.dim} dimensions\n")
+    index_seconds = time.perf_counter() - index_start
+    print(f"{len(chunks)} chunks, {index.dim} dimensions, "
+          f"full indexing run: {index_seconds:.2f} seconds\n")
 
     rows = []
     for question in GOLD:

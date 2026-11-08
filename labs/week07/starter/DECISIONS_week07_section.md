@@ -6,22 +6,35 @@ Copy this into your `DECISIONS.md` and fill it in.
 
 ## Week 7
 
-**Run conditions.** embedding model: [ ] | dimensionality: [ ] | chunk size:
-[ ] | overlap: [ ] | k: 5 | store: Chroma | date: [YYYY-MM-DD] | table from:
-[the recording / my own index]
+**Run conditions.** embedding model: nomic-embed-text:latest | dimensionality: 768 | chunk size:
+600 | overlap: 80 | k: 5 | store: Chroma | date: 2026-11-07] | table from:
+my own index
 
 ### 1. The chunker
 
-size [ ], overlap [ ], because [ ].
+size 600 lexical tokens, overlap 80 lexical tokens, because bigger chunks mean better section context and the overlap can
+carry information across chunk boundaries making everything more flexible without being too large.
 
 ### 2. The index
 
-[ ] chunks, [ ] dimensions, [ ] seconds for one full indexing run.
+56 chunks, 768 dimensions, 11.02 seconds for one full indexing run.
 
 ### 3. The table
 
-| qid | dense rank | keyword rank | recall@5 | tags |
-| | | | | |
+| qid |   dense rank | keyword rank | recall@5 | tags                   |
+|-----|-------------:|-------------:|---------:|------------------------|
+| Q01 |            1 |            4 |     1.00 | distractor, superseded |
+| Q02 |            1 |            4 |     1.00 | rare-token             |
+| Q03 |            1 |            2 |     1.00 | easy                   |
+| Q04 |            1 |            1 |     1.00 | vocabulary             |
+| Q05 |           17 |           11 |     0.00 | multi-document         |
+| Q06 |            1 |            1 |     1.00 | negation               |
+| Q07 |            1 |            2 |     1.00 | easy                   |
+| Q08 |            1 |            1 |     1.00 | numeric                |
+| Q09 |            1 |            4 |     1.00 | distractor             |
+| Q10 |            1 |            1 |     1.00 | easy                   |
+| Q11 |            1 |           13 |     1.00 | easy                   |
+| Q12 | unanswerable |            — |        — | unanswerable           |
 
 ### 4. Good pipeline, or easy task?
 
@@ -30,13 +43,13 @@ that is evidence for. One sentence, and be honest.]
 
 ### 5. The question that fails on both
 
-Question: [ ]. Dense rank [ ], keyword rank [ ].
+Question: Q05, Dense rank 17, keyword rank 13.
 
-Why it fails:
+Why it fails: This question combines two different infromation needs, but the retrieval treats them as one single.
+That means no gold section matches this query exactly, and the retrieval strugglest to find a good match.
 
-[...]
-
-Would any chunk size fix it? [ ], because [ ].
+Would any chunk size fix it? No, because the problem here is about the query itself, and not about the chunks. It would be 
+a good idea to divide the query into two and try to answer each one separately. That would mean the retrieval would be mor accurate.
 
 ### 6. The gold-set correction
 
