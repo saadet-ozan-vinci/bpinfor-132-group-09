@@ -80,8 +80,9 @@ head, even when it looks easy.
 
 Rules for the answer:
   Never state a commune-specific fact that is not supported by the retrieved \
-passages. Quote figures exactly as they appear there.
-  Answer in the language of the question, in under eighty words.
+passages. Quote figures exactly as they appear there, and do not imply that \
+an unsupported detail is available.
+  Answer in the same language as the question.
   Never tell the user to use an internal tool.
 """
 
