@@ -1,4 +1,4 @@
-"""The memory store, exposed over MCP. TODO 4 and 5.
+"""The memory store, exposed over MCP.
 
     python mcp_server.py            # serves on 8000
     PORT=8001 python mcp_server.py  # a second instance, same store
@@ -31,7 +31,7 @@ app = MCPServer("memory-desk")
 
 
 # --------------------------------------------------------------------------
-# TODO 4. The memory tools, over the wire.
+# The memory tools, over the wire.
 # --------------------------------------------------------------------------
 #
 # These are the same three methods you wrote in block 1. What is new is that
@@ -45,7 +45,7 @@ app = MCPServer("memory-desk")
 # A server that caches the store in memory is a server with session state
 # hiding inside it, whatever the protocol says.
 
-# TODO 4. Wrap the three memory methods as MCP tools.
+# Wrap the three memory methods as MCP tools.
 #
 #   remember(subject, kind, fact) -> handle
 #   recall(subject, query, k=3)   -> list of facts
@@ -63,9 +63,42 @@ app = MCPServer("memory-desk")
 # call must read the current state. A server that caches the store at startup
 # has session state hiding inside it, whatever the protocol says.
 
+def load_store() -> MemoryStore:
+    return MemoryStore.load()
+
+
+@app.tool()
+def remember(subject: str, kind: str, fact: str) -> str:
+    """Remember a durable fact about one subject and return its opaque handle.
+
+    Do not use this for temporary details or information the resident has
+    asked to forget. Each write is retained until explicitly forgotten.
+    """
+    return load_store().write(subject, kind, fact)
+
+
+@app.tool()
+def recall(subject: str, query: str, k: int = 3) -> list[str]:
+    """Find up to k relevant remembered facts for this subject only.
+
+    Do not use this to search another resident's information. An empty list
+    means no matching facts were found for this subject.
+    """
+    return load_store().search(subject, query, k)
+
+
+@app.tool()
+def forget(handle: str) -> bool:
+    """Permanently delete the fact identified by its handle.
+
+    Returns false if no stored fact has that handle. This does not erase
+    information already copied into a conversation.
+    """
+    return load_store().forget(handle)
+
 
 # --------------------------------------------------------------------------
-# TODO 5. The handle, which is the week's central move.
+# The handle, which is the week's central move.
 # --------------------------------------------------------------------------
 #
 # open_case mints a name for a piece of ongoing state, and every later call
@@ -85,7 +118,7 @@ app = MCPServer("memory-desk")
 # request can land on any instance. 02_stateless.py measures that at the
 # wire.
 
-# TODO 5. open_case(subject) -> handle, and case_subject(handle) -> subject.
+# open_case(subject) -> handle, and case_subject(handle) -> subject.
 #
 # The handle is the state. Later calls pass it as an ordinary argument
 # instead of the server remembering who you are.
@@ -93,6 +126,20 @@ app = MCPServer("memory-desk")
 # Write the two tools, then answer this in DECISIONS.md: what would the
 # server have had to hold between calls if there were no handle, and what
 # would that cost you when a second instance appears behind a load balancer?
+
+@app.tool()
+def open_case(subject: str) -> str:
+    """Open a case and return its opaque handle for later tool calls."""
+    return load_store().open_case(subject)
+
+
+@app.tool()
+def case_subject(handle: str) -> str:
+    """Resolve a case handle to its subject, or fail if it is not known."""
+    subject = load_store().subject_of(handle)
+    if subject is None:
+        raise ValueError(f"No case exists for handle {handle!r}")
+    return subject
 
 
 if __name__ == "__main__":

@@ -11,24 +11,22 @@ Copy this into your `DECISIONS.md` and fill it in.
 
 ### 1. The handle
 
-Format I chose: [ ]
+Format I chose: opaque handle with uuid
 
-A guessable handle would expose: [ ]
+A guessable handle would expose: a guessable handle would expose my backend making it vulnerable to unauthorized data access. 
 
 ### 2. Conflict and retention
 
-- A write that contradicts an older fact: [keep both / overwrite], because [ ]
-- How long a record lives: [ ], because [ ]
+- A write that contradicts an older fact: keep both, because you might need either depending on the context of the conversation.
+- How long a record lives: 90, because it is a reasonable amount of time before the data becomes too stale.
 
-[Nothing expires by default. If you kept it that way, say so explicitly
-rather than leaving it unsaid. An undeclared retention policy is still a
-retention policy.]
 
 ### 3. What k costs
 
-k = [ ]. Tokens added per call: [ ].
+k = 3 . Tokens added per call: about 5 for the one returned fact in my lab demo (this is an estimation as there is no real llm call).
+At four hundred facts in the store, this design scans and ranks the subject’s facts, then returns at most three matches.
 
-At four hundred facts in the store, this design [ ].
+
 
 ### 4. Memory off against memory on
 
@@ -43,16 +41,17 @@ saying which way it went for you is the entry.]
 ### 5. The protocol, at the wire
 
 | server mode | status | Mcp-Session-Id | answered |
-| stateless_http=True | | | |
-| stateless_http=False | | | |
+| stateless_http=True | 200 | absent |  yes|
+| stateless_http=False | 400 | ee7d76dcf96c4098b15c797378bbb8b0 | no |
 
 The error the session-mode server returned, quoted exactly:
 
-[ ]
+Bad Request: Missing session ID.
 
 Why the two-server handle demonstration does not prove this on its own:
 
-[ ]
+It just proves two servers can read the shared file. The same would work with a statefull protocol, so it doesn't prove the
+protocol request is stateless.
 
 ### 6. What forget does not reach
 

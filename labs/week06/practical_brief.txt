@@ -44,7 +44,7 @@ Three decisions the markers deliberately do not make for you, and all three go i
 
     What a handle looks like. A sequential fact-0007 tells anyone who sees it how many facts exist and lets them guess fact-0006. Week 12 attacks exactly this.
     What a conflicting write does. Keep both and something has to cope with two contradictory facts. Overwrite and you lose what changed.
-    How long a record lives. Nothing expires by default, which is the wrong answer for a service holding residents' data.
+    How long a record lives. The selected policy is 90 days from creation; expired facts and cases are removed on store load.
 
 search is scoped to one subject before anything is scored. That boundary is code rather than a sentence asking the model to be careful, and it is the difference between a design and a hope.
 

@@ -12,8 +12,11 @@ Six items. All six before you open the MCP files.
       subject's facts do not come back
 - [ ] `search` respects `k`, and you can say what `k` costs in tokens per call
 - [ ] `forget` works, and you can say what it does **not** reach
-- [ ] One sentence in `DECISIONS.md` on conflict handling, and one on how
-      long a record lives
+- [ ] Conflicting facts are both retained, and you can explain the policy
+- [ ] Facts and cases expire after 90 days; expired records are removed on
+      store load without a background cleanup process
+- [ ] The chosen conflict and retention policies are recorded in
+      `DECISIONS.md`
 
 ## Checkpoint 2, the wire
 

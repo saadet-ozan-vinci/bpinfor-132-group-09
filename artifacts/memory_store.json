@@ -1,0 +1,18 @@
+{
+  "facts": [
+    {
+      "subject": "A. Muller",
+      "kind": "maintenance",
+      "text": "reported a broken heater",
+      "handle": "fact-253cd834-7b19-4bd0-8cf0-8a7e2c901bc3",
+      "written_at": "2026-11-09T21:55:22Z",
+      "expires_at": "2027-02-07T21:55:22Z"
+    }
+  ],
+  "cases": {
+    "case-f302ef5a-f590-4885-968d-d7b10dccb002": {
+      "subject": "A. Muller",
+      "expires_at": "2027-02-07T21:55:22Z"
+    }
+  }
+}

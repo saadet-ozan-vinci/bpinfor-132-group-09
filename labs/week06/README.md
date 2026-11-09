@@ -77,8 +77,9 @@ go in `DECISIONS.md`:
   attacks exactly this.
 - **What a conflicting write does.** Keep both and something has to cope
   with two contradictory facts. Overwrite and you lose what changed.
-- **How long a record lives.** Nothing expires by default, which is the
-  wrong answer for a service holding residents' data.
+- **How long a record lives.** The selected policy is 90 days from creation.
+  Expired facts and cases are lazily removed when the store is loaded; the
+  lab does not run a background cleanup process.
 
 `search` is scoped to one subject before anything is scored. That boundary
 is code rather than a sentence asking the model to be careful, and it is the

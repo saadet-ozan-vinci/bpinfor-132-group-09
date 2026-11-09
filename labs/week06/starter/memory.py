@@ -1,4 +1,4 @@
-"""The memory store, and the handle. TODO 1 to 3.
+"""The memory store, and the handle.
 
 Two things live here and they are easy to confuse.
 
@@ -17,12 +17,29 @@ with a name the model can see.
 from __future__ import annotations
 
 import json
-import secrets
-import time
+import re
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
 DEFAULT_PATH = Path("artifacts/memory_store.json")
+RETENTION_PERIOD = timedelta(days=90)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _timestamp(value: datetime) -> str:
+    return value.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _parse_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 @dataclass
@@ -32,6 +49,7 @@ class Fact:
     text: str
     handle: str
     written_at: str
+    expires_at: str
 
 
 @dataclass
@@ -45,14 +63,14 @@ class MemoryStore:
 
     path: Path = DEFAULT_PATH
     facts: list[Fact] = field(default_factory=list)
-    cases: dict[str, str] = field(default_factory=dict)
+    cases: dict[str, dict[str, object]] = field(default_factory=dict)
 
     # ----------------------------------------------------------------
-    # TODO 1. Writing, and the handle it returns.
+    # Writing, and the handle it returns.
     # ----------------------------------------------------------------
 
     def write(self, subject: str, kind: str, text: str) -> str:
-        """TODO 1. Append one fact and return a handle for it.
+        """Append one fact and return a handle for it.
 
         Three decisions here, and all three go in DECISIONS.md with a reason.
 
@@ -65,18 +83,28 @@ class MemoryStore:
         means `recall` can return two contradictory facts and something has
         to cope. Overwriting means losing what changed and when. Pick one.
 
-        How long does a record live? Nothing here expires, which is a choice
-        and the wrong one for a real service holding residents' data. If you
-        keep it, say so rather than leaving it unsaid.
+        Records expire 90 days after creation. Expired entries are removed
+        when the store is loaded, so no background cleanup process is needed.
         """
-        raise NotImplementedError("TODO 1: append a fact, return a handle")
+        now = _utcnow()
+        handle = f"fact-{uuid4()}"
+        self.facts.append(Fact(
+            subject=subject,
+            kind=kind,
+            text=text,
+            handle=handle,
+            written_at=_timestamp(now),
+            expires_at=_timestamp(now + RETENTION_PERIOD),
+        ))
+        self.save()
+        return handle
 
     # ----------------------------------------------------------------
-    # TODO 2. Searching, and what k costs.
+    # Searching, and what k costs.
     # ----------------------------------------------------------------
 
     def search(self, subject: str, query: str, k: int = 3) -> list[str]:
-        """TODO 2. Return at most k remembered facts about ONE subject.
+        """Return at most k remembered facts about ONE subject.
 
         Scope to the subject BEFORE you score anything. That is not an
         optimization, it is the boundary that stops one resident's memory
@@ -90,14 +118,34 @@ class MemoryStore:
         Then answer, at the checkpoint: what does k cost you in tokens per
         call, and what happens when the store holds four hundred facts?
         """
-        raise NotImplementedError("TODO 2: search, scoped to the subject")
+        if isinstance(k, bool) or not isinstance(k, int) or k < 0:
+            raise ValueError("k must be a non-negative integer")
+        if k == 0:
+            return []
+
+        # Scope before scoring: facts for other subjects never enter ranking.
+        subject_facts = [fact for fact in self.facts
+                         if fact.subject == subject]
+        query_terms = set(re.findall(r"\w+", query.casefold()))
+        if not query_terms:
+            return []
+
+        scored = []
+        for fact in subject_facts:
+            fact_terms = set(re.findall(
+                r"\w+", f"{fact.kind} {fact.text}".casefold()))
+            score = len(query_terms & fact_terms)
+            if score:
+                scored.append((score, fact.text))
+        scored.sort(key=lambda result: result[0], reverse=True)
+        return [text for _, text in scored[:k]]
 
     # ----------------------------------------------------------------
-    # TODO 3. Forgetting, which is not optional.
+    # Forgetting, which is not optional.
     # ----------------------------------------------------------------
 
     def forget(self, handle: str) -> bool:
-        """TODO 3. Hard delete by handle. Return whether it existed.
+        """Hard delete by handle. Return whether it existed.
 
         Not optional. A store that can only be written to is not a store you
         can operate, and "we keep everything forever" is an answer with a
@@ -107,7 +155,12 @@ class MemoryStore:
         already copied into a running conversation's messages. Deleting the
         fact does not un-say it.
         """
-        raise NotImplementedError("TODO 3: hard delete by handle")
+        remaining = [fact for fact in self.facts if fact.handle != handle]
+        if len(remaining) == len(self.facts):
+            return False
+        self.facts = remaining
+        self.save()
+        return True
 
     # ----------------------------------------------------------------
     # The handle, which is block 2's subject
@@ -115,13 +168,21 @@ class MemoryStore:
 
     def open_case(self, subject: str) -> str:
         """Mint an explicit handle for a piece of ongoing state."""
-        handle = f"case-{secrets.token_hex(6)}"
-        self.cases[handle] = subject
+        now = _utcnow()
+        handle = f"case-{uuid4()}"
+        self.cases[handle] = {
+            "subject": subject,
+            "expires_at": _timestamp(now + RETENTION_PERIOD),
+        }
         self.save()
         return handle
 
     def subject_of(self, handle: str) -> str | None:
-        return self.cases.get(handle)
+        case = self.cases.get(handle)
+        if case is None:
+            return None
+        subject = case.get("subject")
+        return subject if isinstance(subject, str) else None
 
     # ----------------------------------------------------------------
     # Persistence
@@ -139,6 +200,39 @@ class MemoryStore:
         store = cls(path=path)
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
-            store.facts = [Fact(**f) for f in data.get("facts", [])]
-            store.cases = data.get("cases", {})
+            now = _utcnow()
+            changed = False
+
+            for record in data.get("facts", []):
+                record = dict(record)
+                if "expires_at" not in record:
+                    written_at = _parse_timestamp(record["written_at"])
+                    record["expires_at"] = _timestamp(
+                        written_at + RETENTION_PERIOD)
+                    changed = True
+                fact = Fact(**record)
+                if _parse_timestamp(fact.expires_at) > now:
+                    store.facts.append(fact)
+                else:
+                    changed = True
+
+            for handle, value in data.get("cases", {}).items():
+                if isinstance(value, str):
+                    # Legacy cases had no creation time; start retention at migration.
+                    case = {
+                        "subject": value,
+                        "expires_at": _timestamp(now + RETENTION_PERIOD),
+                    }
+                    changed = True
+                else:
+                    case = dict(value)
+                    if "expires_at" not in case:
+                        case["expires_at"] = _timestamp(now + RETENTION_PERIOD)
+                        changed = True
+                if _parse_timestamp(case["expires_at"]) > now:
+                    store.cases[handle] = case
+                else:
+                    changed = True
+            if changed:
+                store.save()
         return store

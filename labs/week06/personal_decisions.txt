@@ -1,0 +1,5 @@
+case handles:  random opaque handles that use uuid
+
+in case of conflicting facts about the same subject what should be done: Keep both, preserving the history
+
+How long should stored facts and case handles be kept: Expire after 90 days

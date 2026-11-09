@@ -1,4 +1,4 @@
-"""Block 2, first half: call the memory tools over MCP. TODO 6.
+"""Block 2, first half: call the memory tools over MCP.
 
     python mcp_server.py &          # in one terminal
     PORT=8001 python mcp_server.py & # and a second instance
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 
+# MCP specification revision 2026-07-28.
 from mcp.client import Client
 
 SUBJECT = "A. Muller"
@@ -29,7 +30,7 @@ async def call(port: int, tool: str, **args):
 
 
 async def main() -> int:
-    """TODO 6. Three steps, and the third has a warning attached.
+    """Three steps, and the third has a warning attached.
 
     1. Connect to :8000 and print the tool catalog. Seeing it arrive over
        HTTP is what makes the boundary real: these tools are not in this
@@ -47,8 +48,31 @@ async def main() -> int:
     file is a file. 02_stateless.py is the demonstration that actually
     distinguishes the two, and it is the next thing you run.
     """
-    raise NotImplementedError("TODO 6: list the catalog, then use a handle "
-                              "across two instances")
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        catalog = await client.list_tools()
+    tools = getattr(catalog, "tools", catalog)
+    print("tools discovered on :8000:")
+    for tool in tools:
+        print(f"  {tool.name}: {tool.description}")
+
+    handle = text_of(await call(8000, "open_case", subject=SUBJECT))
+    print(f"\ncase opened on :8000: {handle}")
+    fact_handle = text_of(await call(
+        8000, "remember", subject=SUBJECT, kind="maintenance",
+        fact="reported a broken heater",
+    ))
+    print(f"fact remembered on :8000: {fact_handle}")
+
+    resolved_subject = text_of(await call(
+        8001, "case_subject", handle=handle,
+    ))
+    facts = await call(
+        8001, "recall", subject=resolved_subject,
+        query="broken heater", k=3,
+    )
+    print(f"case resolved on :8001: {resolved_subject}")
+    print(f"recall from :8001: {text_of(facts)}")
+    return 0
 
 
 if __name__ == "__main__":

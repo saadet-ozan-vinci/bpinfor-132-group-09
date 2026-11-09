@@ -1,4 +1,4 @@
-"""Block 2's demonstration: the protocol core, at the wire. TODO 7.
+"""Block 2's demonstration: the protocol core, at the wire.
 
     python 02_stateless.py
 
@@ -18,6 +18,7 @@ demonstrated is switched off. This one does.
 
 from __future__ import annotations
 
+# MCP specification revision 2026-07-28.
 import asyncio
 import json
 import multiprocessing as mp
@@ -50,13 +51,22 @@ def serve(port: int, stateless: bool) -> None:
 # during an `initialize` handshake and then remembered by the server. Moving
 # it into every request is exactly what "self-describing" means, and it is
 # what makes the request routable to any instance.
-# TODO 7a. Build the self-describing request.
+# Build the self-describing request.
 #
 # A `tools/list` call, JSON-RPC 2.0. The interesting part is `params`: it has
 # to carry its own protocolVersion, clientInfo, and capabilities, because
 # under this revision there is no handshake that established them earlier.
 # Look at the specification for the exact field names before you guess.
-SELF_DESCRIBING = {}   # TODO 7a
+SELF_DESCRIBING = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/list",
+    "params": {
+        "protocolVersion": "2026-07-28",
+        "clientInfo": {"name": "week06-wire-probe", "version": "1.0"},
+        "capabilities": {},
+    },
+}   # MCP specification revision 2026-07-28.
 
 
 def raw_post(port: int, body: dict) -> tuple[int, dict[str, str], str]:
@@ -105,7 +115,7 @@ def main() -> int:
         print(f"  {'stateless' if row['stateless'] else 'session  '} body: "
               f"{row['body'][:110]}")
 
-    # TODO 7b. Three checks. The third is the one that matters.
+    # Three checks. The third is the one that matters.
     #
     # A demonstration is only worth running if it FAILS when the thing being
     # demonstrated is switched off. An earlier version of this block started
@@ -117,7 +127,17 @@ def main() -> int:
     # session mode. If your third check passes in both modes, you have
     # rebuilt the broken version.
     stateless, session = rows
-    checks = {}   # TODO 7b
+    checks = {
+        "stateless server answers the self-describing request":
+            stateless["status"] == 200 and stateless["answered"],
+        "stateless server issues no session id":
+            stateless["session_id"] is None,
+        "session mode rejects the same request with Missing session ID":
+            session["status"] == 400
+            and session["session_id"] is not None
+            and "Missing session ID" in session["body"]
+            and not session["answered"],
+    }
     print()
     for name, passed in checks.items():
         print(f"  [{'PASS' if passed else 'FAIL'}] {name}")

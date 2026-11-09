@@ -20,15 +20,38 @@ import multiprocessing as mp
 import sys
 import tempfile
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
 STORE = Path(tempfile.gettempdir()) / "w06_probe_store.json"
+RETENTION_PERIOD = timedelta(days=90)
+
+
+def _timestamp(value: datetime) -> str:
+    return value.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _load() -> dict:
     if STORE.exists():
-        return json.loads(STORE.read_text())
-    return {"cases": {}, "facts": []}
+        data = json.loads(STORE.read_text())
+    else:
+        return {"cases": {}, "facts": []}
+
+    now = datetime.now(timezone.utc)
+    changed = False
+    for handle, case in list(data["cases"].items()):
+        if "expires_at" not in case:
+            case["expires_at"] = _timestamp(now + RETENTION_PERIOD)
+            changed = True
+        expires_at = datetime.fromisoformat(
+            case["expires_at"].replace("Z", "+00:00"))
+        if expires_at <= now:
+            del data["cases"][handle]
+            changed = True
+    if changed:
+        _save(data)
+    return data
 
 
 def _save(data: dict) -> None:
@@ -45,8 +68,13 @@ def serve(port: int) -> None:
     def open_case(subject: str) -> str:
         """Mint an explicit handle for a resident's case."""
         data = _load()
-        handle = f"case-{len(data['cases']) + 1:04d}"
-        data["cases"][handle] = {"subject": subject, "notes": []}
+        handle = f"case-{uuid4()}"
+        data["cases"][handle] = {
+            "subject": subject,
+            "notes": [],
+            "expires_at": _timestamp(
+                datetime.now(timezone.utc) + RETENTION_PERIOD),
+        }
         _save(data)
         return handle
 
