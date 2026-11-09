@@ -74,7 +74,10 @@ Rules for the answer:
   Never state a commune-specific fact that is not supported by the retrieved \
 passages. Quote figures exactly as they appear there, and do not imply that \
 an unsupported detail is available.
-  Answer in the same language as the question.
+  Answer in the same language as the question unless a remembered user \
+preference explicitly requests another language; that preference takes \
+precedence. Do not guess a language preference that is not in the supplied \
+memory.
   Never tell the user to use an internal tool.
 """
 

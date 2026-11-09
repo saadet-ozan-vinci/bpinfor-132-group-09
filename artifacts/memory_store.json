@@ -7,6 +7,22 @@
       "handle": "fact-253cd834-7b19-4bd0-8cf0-8a7e2c901bc3",
       "written_at": "2026-11-09T21:55:22Z",
       "expires_at": "2027-02-07T21:55:22Z"
+    },
+    {
+      "subject": "A. Muller",
+      "kind": "profile",
+      "text": "My name is Jordan",
+      "handle": "fact-6cf338b8-5bad-489a-8b93-29deadca1aaf",
+      "written_at": "2026-11-09T22:36:46Z",
+      "expires_at": "2027-02-07T22:36:46Z"
+    },
+    {
+      "subject": "A. Muller",
+      "kind": "preference",
+      "text": "I prefer to be answered in french.",
+      "handle": "fact-23a63142-303c-4507-bde6-796c643f1a60",
+      "written_at": "2026-11-09T22:41:30Z",
+      "expires_at": "2027-02-07T22:41:30Z"
     }
   ],
   "cases": {

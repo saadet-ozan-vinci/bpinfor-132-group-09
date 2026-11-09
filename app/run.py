@@ -15,6 +15,12 @@ command reads it back before it reports success. So this is the one command
 that proves the application still runs end to end: if it exits 0, a valid
 trace was written. Run `python -m project.verify` after it, as always.
 
+When `--subject` is supplied, a local model selects useful, explicitly stated
+profile details, preferences, ongoing issues, or service requests to remember.
+It stores only exact quotes from the message; later runs with the same subject
+can retrieve matching details. Without `--subject`, app.run does not
+automatically save personal memory. Facts expire after 90 days.
+
 The exit code is 1 when a run ended in "error", and 0 for every other
 outcome, because a refusal from a stub is the stub working as designed.
 """

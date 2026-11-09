@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from uuid import UUID
 
+from app import pipeline
+from app import agent, agents
 from app.memory import MemoryStore
+from project.trace import TraceRecorder, local_conditions
 
 
 def test_write_returns_opaque_handle_and_persists_expiration(tmp_path):
@@ -117,3 +121,72 @@ def test_pipeline_search_keeps_using_the_week7_index(monkeypatch):
     assert MemoryStore().search("A. Muller", "collection schedule", k=2) == [
         "corpus passage",
     ]
+
+
+class MemorySelectionClient:
+    def __init__(self, memories):
+        content = json.dumps({"memories": memories})
+        self.chat = SimpleNamespace(
+            completions=SimpleNamespace(
+                create=lambda **kwargs: SimpleNamespace(
+                    choices=[SimpleNamespace(message=SimpleNamespace(
+                        content=content))],
+                    usage=SimpleNamespace(
+                        prompt_tokens=12, completion_tokens=8),
+                )))
+
+
+def _run_for_memory_test(tmp_path, monkeypatch, client):
+    monkeypatch.setenv("PROJECT_ROOT", str(tmp_path))
+    recorder = TraceRecorder(
+        week=6, case_id="memory-test",
+        conditions=local_conditions("none"), user_input="test")
+    run = pipeline._Run(recorder, "memory-test", unattended=True)
+    run.client = client
+    return run
+
+
+def test_pipeline_uses_model_to_save_quoted_memories_for_subject(
+        tmp_path, monkeypatch):
+    text = "My name is Alex. I like tea."
+    client = MemorySelectionClient([
+        {"kind": "profile", "quote": "My name is Alex"},
+        {"kind": "preference", "quote": "I like tea"},
+        {"kind": "profile", "quote": "I live in Luxembourg"},
+    ])
+    run = _run_for_memory_test(tmp_path, monkeypatch, client)
+
+    pipeline._remember(run, "A. Muller", text)
+
+    store = MemoryStore.load(tmp_path / "artifacts" / "memory_store.json")
+    assert [(fact.kind, fact.text) for fact in store.facts] == [
+        ("profile", "My name is Alex"),
+        ("preference", "I like tea"),
+    ]
+    assert run.models
+
+
+def test_pipeline_retrieves_personal_memory_and_corpus_together(
+        tmp_path, monkeypatch):
+    class Index:
+        def search(self, query, k):
+            return [SimpleNamespace(text="commune corpus passage")]
+
+    monkeypatch.setattr(MemoryStore, "_index", Index(), raising=False)
+    run = _run_for_memory_test(tmp_path, monkeypatch, client=None)
+    store = MemoryStore(tmp_path / "artifacts" / "memory_store.json")
+    store.write("A. Muller", "profile", "My name is Alex")
+
+    facts = pipeline._recall(run, "A. Muller", "What is my name?")
+
+    assert facts == [
+        "commune corpus passage",
+        "Remembered profile: My name is Alex",
+    ]
+
+
+def test_remembered_language_preference_overrides_question_language():
+    assert "remembered user" in agent.SYSTEM
+    assert "takes precedence" in agent.SYSTEM
+    assert "explicit remembered language preference" in agents.REVIEW_PROMPT
+    assert "honor that" in agents.REVIEW_PROMPT
