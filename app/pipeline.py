@@ -242,7 +242,7 @@ def _answer(run: _Run, text: str, facts: list[str]) -> tuple[str, Outcome]:
     """The answer route: plan, run the agent loop, then review."""
     with run.rec.step("model", "agents.make_plan") as s:
         if not _mark(s, agents.make_plan, 5):
-            run.models.add(getattr(agents, "MODEL_NAME", LARGE.name))
+            run.models.add(agents.MODEL_NAME)
         plan = agents.make_plan(text)
         plan_ok, problems = agents.validate_plan(plan)
         s.detail(steps=len(plan.steps), plan_ok=plan_ok, problems=problems)
