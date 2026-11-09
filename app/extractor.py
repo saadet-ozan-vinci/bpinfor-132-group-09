@@ -184,36 +184,3 @@ def get_client(replay: bool):
     return OpenAI(base_url=BASE_URL, api_key=API_KEY)
 
 
-def run_variant(client, system: str, label: str, docs, golds):
-    """Extract every document, record a trace each, and score.
-
-    Shared by the zero-shot and the few-shot runners so that the two
-    variants genuinely go through the same code. If you find yourself
-    copying this function to change one thing for one variant, stop: that is
-    how a comparison quietly stops being a comparison.
-    """
-    from scoring import score_all
-    from project.trace import TraceRecorder, local_conditions
-
-    records, metas = [], []
-    for doc in docs:
-        rec = TraceRecorder(
-            week=2, case_id=doc.id,
-            conditions=local_conditions(SMALL.name, temperature=0.0,
-                                        prompt_version=PROMPT_VERSION,
-                                        variant=label, language=doc.lang),
-            user_input=doc.text)
-        with rec.step("model", SMALL.name) as step:
-            record, meta = extract(client, system, doc.text)
-            step.tokens(meta["prompt_tokens"], meta["completion_tokens"])
-            step.detail(valid=record is not None, error=meta["error"])
-        rec.finish(output=meta["raw"], outcome="ok" if record else "error")
-        records.append(record)
-        metas.append(meta)
-
-    board = score_all(records, golds, docs)
-    tok = sum(m["prompt_tokens"] + m["completion_tokens"] for m in metas)
-    secs = sum(m["seconds"] for m in metas)
-    print(f"{label}: {board.as_counts()}   invalid {board.invalid}")
-    print(f"  {tok} tokens, {secs:.1f}s over {len(docs)} documents\n")
-    return board, records, metas
