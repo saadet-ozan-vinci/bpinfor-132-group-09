@@ -13,7 +13,10 @@ name = "ai-agents-project"
 version = "0.1.0"
 description = "BPINFOR-132 project spine, the application, and the fourteen practical sessions built on them"
 requires-python = ">=3.10"
-dependencies = ["pydantic>=2.9,<3"]
+dependencies = [
+    "pydantic>=2.9,<3",
+    "mcp==2.0.0rc1",
+]
 
 # Found by name rather than listed, so the install works before app/ exists
 # and after, and the folders you unpacked beside them (labs/, project_spine/,

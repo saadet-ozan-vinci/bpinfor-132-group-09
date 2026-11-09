@@ -7,7 +7,7 @@ Copy this into your `DECISIONS.md` and fill it in.
 ## Week 6
 
 **Run conditions.** MCP SDK version: [ ] | specification revision:
-2026-07-28 | model: [ ] | served locally | date: [YYYY-MM-DD]
+2026-07-28 | model: [ ] | served locally | date: [2026-11-09]
 
 ### 1. The handle
 
