@@ -14,9 +14,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
-from .routes import ROUTES, SPECIALISTS, SYSTEM_ROUTER
-
-from project.models import BASE_URL, API_KEY, SMALL
+from .routes import SYSTEM_ROUTER
+from project.models import SMALL
 
 
 class Decision(BaseModel):
