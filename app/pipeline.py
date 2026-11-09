@@ -271,8 +271,7 @@ def _answer(run: _Run, text: str, facts: list[str]) -> tuple[str, Outcome]:
             s.tokens(result.tokens or None, None)
             s.detail(steps=result.steps, tool_calls=result.tool_calls,
                      cap_fired=result.cap_fired,
-                     tool_errors=result.tool_errors,
-                     saw_injection=result.saw_injection)
+                     tool_errors=result.tool_errors)
     if result is None or not res.ok:
         run.missing.append("agent")
         return f"I could not answer this right now. {HELP_DESK}", "degraded"

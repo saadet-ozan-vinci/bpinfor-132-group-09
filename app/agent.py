@@ -12,9 +12,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from .handbook import INJECTION_MARKER
 from .tools import SCHEMAS as ANTHROPIC_SCHEMAS
-from .tools import compute, search_services
+from .tools import compute
 
 from project.models import LARGE
 from project.trace import TraceRecorder, local_conditions
@@ -23,10 +22,8 @@ from project.trace import TraceRecorder, local_conditions
 # TODO 1. The schemas, in the shape this endpoint speaks.
 # --------------------------------------------------------------------------
 #
-# The descriptions in tools.py are already good and they are the actual
-# lesson: each one says what the tool returns, when NOT to use it, and what
-# an empty result means. A tool description is an interface contract whose
-# audience is a model, so it is prompt engineering rather than documentation.
+# The tool description in tools.py is an interface contract whose audience
+# is a model, so it is prompt engineering rather than documentation.
 #
 # What changes here is only the envelope. The local endpoint speaks the
 # OpenAI wire format, which nests the schema under "function" and calls the
@@ -36,10 +33,6 @@ from project.trace import TraceRecorder, local_conditions
 
 def to_openai_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """Wrap one Anthropic-shaped schema for the OpenAI wire format.
-
-    The descriptions in tools.py are already written and they are the actual
-    lesson: read them before you write this function. Each one says what the
-    tool returns, when NOT to use it, and what an empty result means.
 
     All you do here is change the envelope. OpenAI nests the schema under a
     "function" key and calls the parameter block "parameters"; the shape in
@@ -58,7 +51,6 @@ def to_openai_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 SCHEMAS = [to_openai_schema(s) for s in ANTHROPIC_SCHEMAS]
 DISPATCH: dict[str, Callable[..., Any]] = {
-    "search_services": search_services,
     "compute": compute,
 }
 
@@ -101,7 +93,6 @@ class Run:
     seconds: float = 0.0
     tokens: int = 0
     cap_fired: str | None = None
-    saw_injection: bool = False       # did the hostile text reach the model
     tool_errors: int = 0
 
     @property
@@ -182,7 +173,7 @@ def run_tool_call(name: str, raw_arguments: str) -> tuple[Any, bool]:
 # --------------------------------------------------------------------------
 
 def run_task(client, task, model: str = LARGE.name,
-             max_steps: int = 6, stall_limit: int = 2,
+             max_steps: int = 6,
              system: str = SYSTEM, week: int = 4,
              tools: list[dict[str, Any]] | None = SCHEMAS) -> Run:
     """TODO 2, 3, 4. The whole agent: a while loop with three exits.
@@ -204,18 +195,10 @@ def run_task(client, task, model: str = LARGE.name,
       fires, set `run.cap_fired` and produce a partial answer through
       `_partial` below. Never an empty string and never an exception.
 
-    TODO 4, the no-progress detector. Track which doc_ids you have already
-      seen. If a step brings back nothing new, that is one stall; if it
-      happens `stall_limit` times in a row, stop.
+    The RAG stage retrieves passages before the agent runs, so this loop has
+    no search tool or search-specific progress detector.
 
-      Defining progress is the design decision here and there is more than
-      one defensible answer. "A document id I had not seen" is the one this
-      solution uses because it is cheap, needs no model, and does not fire
-      on a legitimate second search with different keywords, which naive
-      "same call twice" detectors do. Say in DECISIONS.md what yours is.
-
-    Fill in `run` as you go: steps, tool_calls, tokens, tool_errors, and
-    `saw_injection` when the tool result contains handbook.INJECTION_MARKER.
+    Fill in `run` as you go: steps, tool_calls, tokens, and tool_errors.
     Record a trace with TraceRecorder exactly as weeks 1 to 3 did, one span
     per model call and one per tool call, because week 10 evaluates this.
 
@@ -225,13 +208,8 @@ def run_task(client, task, model: str = LARGE.name,
     """
     if max_steps < 1:
         raise ValueError("max_steps must be at least 1")
-    if stall_limit < 1:
-        raise ValueError("stall_limit must be at least 1")
-
     t0 = time.perf_counter()
     run = Run(task_id=task.id)
-    seen_docs: set[str] = set()
-    consecutive_stalls = 0
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": system},
@@ -245,7 +223,6 @@ def run_task(client, task, model: str = LARGE.name,
             model,
             temperature=0.0,
             max_steps=max_steps,
-            stall_limit=stall_limit,
             tools_enabled=bool(tools),
         ),
         user_input=task.question,
@@ -294,9 +271,6 @@ def run_task(client, task, model: str = LARGE.name,
         else:
             messages.append(message)
 
-        search_called = False
-        new_docs_this_turn = 0
-
         # Run all tools called this turn
         for tc in message.tool_calls:
             name = tc.function.name
@@ -311,19 +285,7 @@ def run_task(client, task, model: str = LARGE.name,
                     run.tool_errors += 1
                     s.failed(res_str)
 
-                if INJECTION_MARKER in res_str:
-                    run.saw_injection = True
-
-                if name == "search_services":
-                    search_called = True
-                    if not is_error:
-                        run.evidence.append(
-                            f"search_services result: {res_str}")
-                    found_ids = set(_doc_ids(res_str))
-                    new_ids = found_ids - seen_docs
-                    new_docs_this_turn += len(new_ids)
-                    seen_docs.update(found_ids)
-                elif not is_error:
+                if not is_error:
                     run.evidence.append(f"{name} result: {res_str}")
 
             messages.append(
@@ -334,21 +296,6 @@ def run_task(client, task, model: str = LARGE.name,
                 }
             )
 
-        # to do 4: Stall detection evaluated per turn
-        if search_called:
-            if new_docs_this_turn == 0:
-                consecutive_stalls += 1
-            else:
-                consecutive_stalls = 0
-
-        if consecutive_stalls >= stall_limit:
-            run.cap_fired = "no_progress"
-            run.answer = _partial(
-                run,
-                "Stall limit reached: Stopped due to repeated searches with no new documents found",
-            )
-            break
-
     # Finalize and persist trace outside the loop
     run.seconds = time.perf_counter() - t0
     outcome = "degraded" if run.cap_fired else "ok"
@@ -358,7 +305,6 @@ def run_task(client, task, model: str = LARGE.name,
         cap_fired=run.cap_fired,
         tool_calls=run.tool_calls,
         tool_errors=run.tool_errors,
-        saw_injection=run.saw_injection,
         persist=False,
     )
     return run
@@ -374,15 +320,3 @@ def _partial(run: Run, reason: str) -> str:
     return (f"I could not complete this. {reason}, after "
             f"{len(run.tool_calls)} tool call(s). Please telephone the help "
             f"desk on 4796-2222.")
-
-
-def _doc_ids(tool_result: Any) -> set[str]:
-    try:
-        parsed = json.loads(tool_result) if isinstance(tool_result, str) \
-            else tool_result
-    except (json.JSONDecodeError, TypeError):
-        return set()
-    if not isinstance(parsed, list):
-        return set()
-    return {h.get("doc_id") for h in parsed
-            if isinstance(h, dict) and h.get("doc_id")}
