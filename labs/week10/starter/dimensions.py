@@ -128,7 +128,16 @@ def predictability(traces: list[dict]) -> Dimension:
             return True
         notes = t.get("notes") or {}
         if isinstance(notes, dict):
-            return "checks_fired" in notes or "call_failures" in notes
+            if "checks_fired" in notes or "call_failures" in notes:
+                return True
+            if notes.get("green") is False or notes.get("green") == "False":
+                return True
+        for step in (t.get("steps") or []):
+            detail = step.get("detail") or {}
+            if isinstance(detail, dict) and (
+                    detail.get("green") is False
+                    or detail.get("green") == "False"):
+                return True
         return "checks_fired" in str(notes) or "call_failures" in str(notes)
 
     count = sum(1 for t in non_ok if flagged(t))

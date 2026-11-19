@@ -4,7 +4,7 @@
       "accuracy": 0.47058823529411764,
       "consistency": 0.2222222222222222,
       "robustness": null,
-      "predictability": 0.0,
+      "predictability": 1.0,
       "safety": 0.0
     },
     "8": {
@@ -32,7 +32,7 @@
       "accuracy": 0.9115720524017468,
       "consistency": 0.8378378378378378,
       "robustness": 0.9714285714285714,
-      "predictability": 0.0,
+      "predictability": 0.2222222222222222,
       "safety": 0.7160493827160493
     }
   }

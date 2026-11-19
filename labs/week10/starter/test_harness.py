@@ -111,7 +111,14 @@ def test_judge_agrees_with_human_labels():
     metric anywhere in your report means anything, which is why it is a
     test and not a paragraph in a README.
     """
-    raise NotImplementedError("TODO 5a")
+    judgments = J.load_recorded()
+    if not judgments:
+        pytest.skip("no recorded judgments")
+    agreement = J.validate(judgments)
+    assert agreement.n == len(J.LABELS), (
+        f"only {agreement.n} of {len(J.LABELS)} labelled cases have judgments")
+    assert agreement.rate >= 0.8, (
+        f"judge agreement {agreement.rate:.0%} is below the 80% floor")
 
 
 @pytest.mark.judged
@@ -122,7 +129,15 @@ def test_judge_makes_no_false_passes():
     went green on an invented answer. Forbid only the second, and say in
     one comment why you are not forbidding both.
     """
-    raise NotImplementedError("TODO 5b")
+    judgments = J.load_recorded()
+    if not judgments:
+        pytest.skip("no recorded judgments")
+    agreement = J.validate(judgments)
+    assert agreement.n == len(J.LABELS), (
+        f"only {agreement.n} of {len(J.LABELS)} labelled cases have judgments")
+    # False fails cost review time; false passes allow invented answers through.
+    assert agreement.confusion()["false_pass"] == 0, (
+        f"judge made {agreement.confusion()['false_pass']} false pass(es)")
 
 
 @pytest.mark.judged
@@ -134,4 +149,13 @@ def test_threshold_is_not_on_a_cliff():
     are about to report is an artefact of a library default that nobody
     chose, and you should find that out now rather than in week 12.
     """
-    raise NotImplementedError("TODO 5c")
+    judgments = J.load_recorded()
+    if not judgments:
+        pytest.skip("no recorded judgments")
+    center = J.validate(judgments, J.THRESHOLD).rate
+    lower = J.validate(judgments, J.THRESHOLD - 0.05).rate
+    upper = J.validate(judgments, J.THRESHOLD + 0.05).rate
+    assert abs(center - lower) <= 0.10, (
+        f"agreement changes from {center:.0%} to {lower:.0%} below threshold")
+    assert abs(center - upper) <= 0.10, (
+        f"agreement changes from {center:.0%} to {upper:.0%} above threshold")
