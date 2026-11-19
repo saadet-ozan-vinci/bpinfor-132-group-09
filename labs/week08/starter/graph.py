@@ -50,7 +50,12 @@ def validate_fee(value) -> None:
     the success path. If you have no validation, a renamed field flows all
     the way to the answer and the run reports success.
     """
-    raise NotImplementedError("TODO 4: validate the fee contract")
+    if (not isinstance(value, dict)
+            or isinstance(value.get("fee_eur"), bool)
+            or not isinstance(value.get("fee_eur"), (int, float))
+            or not isinstance(value.get("period"), str)
+            or not value["period"]):
+        raise ContractDrift("fee response does not match the fee contract")
 
 
 # --------------------------------------------------------------------------
@@ -73,7 +78,23 @@ def gather(state: CaseState, plan: FaultPlan) -> dict:
     Record what is absent in `missing` so `draft` can say it out loud, and
     append to `events` so the checkpoint has something to count.
     """
-    raise NotImplementedError("TODO 3a: gather with a policy")
+    result = call_with_policy(
+        tools.search, plan, state["topic"], policy=SEARCH_POLICY,
+        fallback=tools.keyword_fallback,
+    )
+    passages = result.value if isinstance(result.value, list) else []
+    missing = list(state.get("missing", []))
+    events = [f"search:{result.outcome}:{result.tries}"]
+    if not passages:
+        missing.append("search evidence")
+        events.append("search:empty")
+    return {
+        "passages": passages,
+        "missing": missing,
+        "degraded": state.get("degraded", False) or not passages
+                    or result.outcome in {"degraded", "escalated"},
+        "events": events,
+    }
 
 
 def price(state: CaseState, plan: FaultPlan) -> dict:
@@ -82,7 +103,21 @@ def price(state: CaseState, plan: FaultPlan) -> dict:
     This is the step contract drift hits. Without a validator the renamed
     field flows into the answer and the run reports success.
     """
-    raise NotImplementedError("TODO 3b: price with validation")
+    result = call_with_policy(
+        tools.fees, plan, state["topic"], policy=FEES_POLICY,
+        validate=validate_fee,
+    )
+    fee = result.value if result.ok and isinstance(result.value, dict) else {}
+    missing = list(state.get("missing", []))
+    if not fee:
+        missing.append("fee information")
+    return {
+        "fee": fee,
+        "missing": missing,
+        "degraded": state.get("degraded", False) or not fee
+                    or result.outcome in {"degraded", "escalated"},
+        "events": [f"fees:{result.outcome}:{result.tries}"],
+    }
 
 
 def draft(state: CaseState) -> dict:
@@ -95,8 +130,25 @@ def draft(state: CaseState) -> dict:
     A degrade path that returns an empty string is technically graceful and
     completely useless.
     """
-    raise NotImplementedError(
-        "TODO 5: assemble the answer and name what is missing")
+    passages = state.get("passages", [])
+    fee = state.get("fee", {})
+    parts = []
+    if passages:
+        parts.append("Evidence: " + " ".join(str(item) for item in passages))
+    if fee:
+        parts.append(
+            f"Fee: {fee['fee_eur']} EUR per {fee['period']}."
+        )
+    missing = sorted(set(state.get("missing", [])))
+    if missing:
+        parts.append("Missing: " + ", ".join(missing) + ".")
+    if not parts:
+        parts.append("No answer is available because the required information is missing.")
+    return {
+        "draft": " ".join(parts),
+        "degraded": state.get("degraded", False) or bool(missing),
+        "events": ["draft:degraded" if missing else "draft:complete"],
+    }
 
 
 def submit(state: CaseState) -> dict:

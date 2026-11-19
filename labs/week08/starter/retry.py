@@ -72,7 +72,7 @@ def is_retryable(exc: BaseException) -> bool:
     a broken credential into a slow broken credential, and on some upstreams
     into a locked account.
     """
-    raise NotImplementedError("TODO 1: which errors are retryable")
+    return isinstance(exc, (ToolTimeout, RateLimited, ServerError))
 
 
 # --------------------------------------------------------------------------
@@ -105,4 +105,50 @@ def call_with_policy(fn, *args, policy: StepPolicy, fallback=None,
     ladder skips past retrying straight to the fallback. If you find
     yourself retrying a drifted response, TODO 1 is wrong.
     """
-    raise NotImplementedError("TODO 2: the retry ladder")
+    result = StepResult()
+    started = time.monotonic()
+    attempts = max(1, policy.attempts)
+
+    for number in range(1, attempts + 1):
+        try:
+            value = fn(*args, **kwargs)
+            if validate is not None:
+                validate(value)
+            result.value = value
+            result.ok = True
+            result.outcome = "ok"
+            result.attempts.append(Attempt(number, None))
+            return result
+        except Exception as exc:
+            result.attempts.append(Attempt(number, str(exc)))
+            if not is_retryable(exc) or number >= attempts:
+                break
+
+            elapsed = time.monotonic() - started
+            remaining = policy.max_elapsed - elapsed
+            if remaining <= 0:
+                break
+
+            maximum_delay = policy.base_delay * (2 ** (number - 1))
+            delay = (random.uniform(0, maximum_delay)
+                     if policy.jitter else maximum_delay)
+            delay = min(delay, remaining)
+            if delay > 0:
+                time.sleep(delay)
+                result.attempts[-1].slept = delay
+            if time.monotonic() - started >= policy.max_elapsed:
+                break
+
+    if fallback is not None:
+        try:
+            result.value = fallback(*args, **kwargs)
+            result.ok = True
+            result.used_fallback = True
+            result.outcome = "fallback"
+            return result
+        except Exception as exc:
+            result.attempts.append(Attempt(result.tries + 1, str(exc)))
+
+    result.ok = False
+    result.outcome = "degraded" if policy.on_exhausted == "degrade" else "escalated"
+    return result

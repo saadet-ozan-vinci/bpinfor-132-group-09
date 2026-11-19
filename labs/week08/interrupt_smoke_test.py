@@ -19,7 +19,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
-DB = Path("/tmp/w08_probe.sqlite")
+DB = Path(__file__).resolve().parent / "week08_probe.sqlite"
 THREAD = "case-0001"
 
 
@@ -65,41 +65,40 @@ def main() -> int:
     mode = sys.argv[1] if len(sys.argv) > 1 else "start"
     cfg = {"configurable": {"thread_id": THREAD}}
 
+    if mode == "start":
+        DB.unlink(missing_ok=True)
+
     with SqliteSaver.from_conn_string(str(DB)) as saver:
         graph = build(saver)
         if mode == "start":
-            DB.unlink(missing_ok=True)
-        with SqliteSaver.from_conn_string(str(DB)) as saver2:
-            graph = build(saver2)
-            if mode == "start":
-                out = graph.invoke({"subject": "A. Muller", "draft": "",
-                                    "submitted": False, "decision": "",
-                                    "side_effects": []}, cfg)
-                print("  run paused. state now:")
-                print(f"    __interrupt__ present: {'__interrupt__' in out}")
-                if "__interrupt__" in out:
-                    payload = out["__interrupt__"][0].value
-                    print(f"    payload action: {payload.get('action')}")
-                    print(f"    payload reason: {payload.get('reason')}")
-                snap = graph.get_state(cfg)
-                print(f"    next node: {snap.next}")
-                print(f"    side effects so far: "
-                      f"{snap.values.get('side_effects')}")
-                print("\n  now run:  python probe_week08.py resume approve")
-            else:
-                verdict = sys.argv[2] if len(sys.argv) > 2 else "approve"
-                before = graph.get_state(cfg)
-                print(f"  resuming a run this process did not create")
-                print(f"    next node was: {before.next}")
-                out = graph.invoke(
-                    Command(resume={"verdict": verdict, "by": "a.muller"}),
-                    cfg)
-                print(f"    submitted: {out.get('submitted')}")
-                print(f"    decision:  {out.get('decision')}")
-                print(f"    side effects: {out.get('side_effects')}")
-                dupes = [e for e in out.get("side_effects", [])
-                         if out["side_effects"].count(e) > 1]
-                print(f"    duplicated side effects: {sorted(set(dupes)) or 'none'}")
+            out = graph.invoke({"subject": "A. Muller", "draft": "",
+                                "submitted": False, "decision": "",
+                                "side_effects": []}, cfg)
+            print("  run paused. state now:")
+            print(f"    __interrupt__ present: {'__interrupt__' in out}")
+            if "__interrupt__" in out:
+                payload = out["__interrupt__"][0].value
+                print(f"    payload action: {payload.get('action')}")
+                print(f"    payload reason: {payload.get('reason')}")
+            snap = graph.get_state(cfg)
+            print(f"    next node: {snap.next}")
+            print(f"    side effects so far: "
+                  f"{snap.values.get('side_effects')}")
+            print("\n  now run:  python probe_week08.py resume approve")
+        else:
+            verdict = sys.argv[2] if len(sys.argv) > 2 else "approve"
+            before = graph.get_state(cfg)
+            print(f"  resuming a run this process did not create")
+            print(f"    next node was: {before.next}")
+            out = graph.invoke(
+                Command(resume={"verdict": verdict, "by": "a.muller"}),
+                cfg)
+            print(f"    submitted: {out.get('submitted')}")
+            print(f"    decision:  {out.get('decision')}")
+            print(f"    side effects: {out.get('side_effects')}")
+            dupes = [e for e in out.get("side_effects", [])
+                     if out["side_effects"].count(e) > 1]
+            print(f"    duplicated side effects: {sorted(set(dupes)) or 'none'}")
     return 0
 
 

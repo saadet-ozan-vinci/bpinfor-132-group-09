@@ -4,7 +4,7 @@ Run it as TWO separate invocations. That is the whole exercise: if the pause
 only survives inside one script, it is a session variable with extra steps.
 
     python 02_gate.py start
-    python 02_gate.py resume approve      # or reject, or edit
+    python 02_gate.py resume approve      # or reject, edit, or timeout
 
 The written answer is at the bottom, and the second half of it is the part
 that is not on any slide.
@@ -65,7 +65,8 @@ def main() -> int:
         print(f"  resuming a run this process did not create")
         print(f"    it was paused before: {before.next}\n")
 
-        resume = {"verdict": verdict, "by": "a.muller"}
+        resume = {"verdict": verdict, "by": "system-timeout"
+                  if verdict == "timeout" else "a.muller"}
         if verdict == "edit":
             # The approver's most common response is neither approve nor
             # reject: it is approve with one field changed. A gate with no
