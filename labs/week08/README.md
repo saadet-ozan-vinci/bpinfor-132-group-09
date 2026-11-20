@@ -199,6 +199,21 @@ Four entries. Template in `starter/DECISIONS_week08_section.md`.
   is worth more than another feature.
 - Put a write above the interrupt and prove the duplicate to yourself.
 
+## Homework implementation
+
+The homework trace demo writes `trace_homework.json` inside this folder and
+contains separate `week08.retry`, `week08.fallback`, and `week08.gate` spans:
+
+```powershell
+Push-Location labs\week08\starter
+python .\trace_homework.py
+Pop-Location
+python -m pytest labs\week08\test_week08_homework.py -q
+```
+
+The tests also resume the gate programmatically with the timeout verdict and
+assert that the submission is rejected without side effects.
+
 ## Reference solution
 
 In `solution/`, published after the session. The written answer to TODO 7 is

@@ -1,0 +1,30 @@
+{
+  "spans": [
+    {
+      "name": "week08.fallback",
+      "attributes": {
+        "items": 1
+      },
+      "status": "UNSET"
+    },
+    {
+      "name": "week08.retry",
+      "attributes": {
+        "outcome": "fallback",
+        "attempts": 3,
+        "fallback": true
+      },
+      "status": "UNSET"
+    },
+    {
+      "name": "week08.gate",
+      "attributes": {
+        "paused": true,
+        "action": "submit_case",
+        "submitted": false,
+        "decision": "timeout"
+      },
+      "status": "UNSET"
+    }
+  ]
+}
