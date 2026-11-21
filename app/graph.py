@@ -30,9 +30,97 @@ interrupt, read only.
 
 from __future__ import annotations
 
-from .stub import stub
+from pathlib import Path
+from typing import Annotated, TypedDict
+
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
+
+from project.trace import repo_root
 
 
-@stub(week=8, does="refuses: rejects every submission, nothing is submitted")
+def append(a: list, b: list) -> list:
+    return a + b
+
+
+class ApprovalState(TypedDict):
+    payload: dict
+    submitted: bool
+    decision: str
+    arguments: dict
+    side_effects: Annotated[list[str], append]
+    events: Annotated[list[str], append]
+
+
+def approval_node(state: ApprovalState) -> dict:
+    payload = state["payload"]
+    resume = interrupt(payload)
+    verdict = resume.get("verdict")
+    if verdict == "approve":
+        return {
+            "submitted": True,
+            "decision": "approve",
+            "arguments": payload.get("arguments", {}),
+            "side_effects": [f"SUBMITTED {payload['case_id']}"],
+            "events": [f"gate:approve:{resume.get('by', '?')}"],
+        }
+    if verdict == "edit":
+        arguments = resume.get("arguments") or payload.get("arguments", {})
+        return {
+            "submitted": True,
+            "decision": "edit",
+            "arguments": arguments,
+            "side_effects": [f"SUBMITTED {payload['case_id']} (edited)"],
+            "events": [f"gate:edit:{resume.get('by', '?')}"],
+        }
+    return {
+        "submitted": False,
+        "decision": verdict or "reject",
+        "arguments": payload.get("arguments", {}),
+        "side_effects": [],
+        "events": [f"gate:{verdict or 'reject'}:{resume.get('by', '?')}"],
+    }
+
+
+def build_approval_graph(saver):
+    graph = StateGraph(ApprovalState)
+    graph.add_node("approval", approval_node)
+    graph.add_edge(START, "approval")
+    graph.add_edge("approval", END)
+    return graph.compile(checkpointer=saver)
+
+
 def request_approval(payload: dict, unattended: bool = False) -> dict:
-    return {"verdict": "reject", "by": "stub", "arguments": {}}
+    if unattended:
+        return {"verdict": "timeout", "by": "system-timeout", "arguments": {}}
+
+    db = repo_root() / "artifacts" / "week08_approvals.sqlite"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    config = {
+        "configurable": {
+            "thread_id": f"{payload.get('action', 'approval')}:{payload['case_id']}",
+        }
+    }
+    initial = {
+        "payload": payload,
+        "submitted": False,
+        "decision": "",
+        "arguments": payload.get("arguments", {}),
+        "side_effects": [],
+        "events": [],
+    }
+    with SqliteSaver.from_conn_string(str(db)) as saver:
+        approval_graph = build_approval_graph(saver)
+        out = approval_graph.invoke(initial, config)
+        if "__interrupt__" in out:
+            return {
+                "verdict": "timeout",
+                "by": "awaiting-human",
+                "arguments": payload.get("arguments", {}),
+            }
+    return {
+        "verdict": out.get("decision") or "reject",
+        "by": "approval",
+        "arguments": out.get("arguments", payload.get("arguments", {})),
+    }

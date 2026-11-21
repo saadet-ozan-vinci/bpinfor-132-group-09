@@ -23,9 +23,11 @@ lecture's rule is to choose them per step, in advance, by consequence.
 
 from __future__ import annotations
 
+import random
+import time
 from dataclasses import dataclass, field
 
-from .stub import stub
+from .faults import ContractDrift, RateLimited, ServerError, ToolTimeout
 
 
 @dataclass
@@ -57,13 +59,57 @@ class StepResult:
         return len(self.attempts)
 
 
-@stub(week=8, does="retries nothing")
 def is_retryable(exc: BaseException) -> bool:
-    return False
+    return isinstance(exc, (ToolTimeout, RateLimited, ServerError))
 
 
-@stub(week=8, does="pass-through: one attempt, no fallback, errors propagate")
 def call_with_policy(fn, *args, policy: StepPolicy, fallback=None,
                      validate=None, **kwargs) -> StepResult:
-    value = fn(*args, **kwargs)
-    return StepResult(value=value, ok=True, attempts=[Attempt(1, None)])
+    result = StepResult()
+    started = time.monotonic()
+    attempts = max(1, policy.attempts)
+
+    for number in range(1, attempts + 1):
+        try:
+            value = fn(*args, **kwargs)
+            if validate is not None:
+                validate(value)
+            result.value = value
+            result.ok = True
+            result.outcome = "ok"
+            result.attempts.append(Attempt(number, None))
+            return result
+        except Exception as exc:
+            result.attempts.append(Attempt(number, str(exc)))
+            if not is_retryable(exc) or number >= attempts:
+                break
+
+            elapsed = time.monotonic() - started
+            remaining = policy.max_elapsed - elapsed
+            if remaining <= 0:
+                break
+
+            maximum_delay = policy.base_delay * (2 ** (number - 1))
+            delay = (random.uniform(0, maximum_delay)
+                     if policy.jitter else maximum_delay)
+            delay = min(delay, remaining)
+            if delay > 0:
+                time.sleep(delay)
+                result.attempts[-1].slept = delay
+            if time.monotonic() - started >= policy.max_elapsed:
+                break
+
+    if fallback is not None:
+        try:
+            result.value = fallback(*args, **kwargs)
+            result.ok = True
+            result.used_fallback = True
+            result.outcome = "fallback"
+            return result
+        except Exception as exc:
+            result.attempts.append(Attempt(result.tries + 1, str(exc)))
+
+    result.ok = False
+    result.outcome = ("degraded" if policy.on_exhausted == "degrade"
+                      else "escalated")
+    return result
