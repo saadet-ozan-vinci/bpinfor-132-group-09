@@ -156,7 +156,11 @@ def forbidden_tool_argument(argument: str) -> Verdict:
     the dodge attacks in the corpus do not defeat it. Placement, not
     cleverness.
     """
-    raise NotImplementedError("TODO 3: forbidden_tool_argument")
+    normalized = argument.casefold()
+    for forbidden_term, category in FORBIDDEN_TOOL_ARGS.items():
+        if forbidden_term.casefold() in normalized:
+            return Verdict(True, category)
+    return Verdict(False)
 
 
 GUARDS: dict[str, Guard] = {
