@@ -88,20 +88,26 @@ class Guard:
 # the whole trade-off of the session.
 # --------------------------------------------------------------------------
 
-NAIVE_PATTERNS: list[str] = [
-    # TODO 1a. Four or five patterns for the obvious phrasings. Start here,
-    # measure, and resist the urge to make them clever yet.
+# TODO 1a. Four or five patterns for the obvious phrasings. Start here,
+# measure, and resist the urge to make them clever yet.
+NAIVE_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\bignore\s+(my|your)\s+instructions?\b", re.IGNORECASE),
+    re.compile(r"\bforget\s+(my|your)\s+instructions?\b", re.IGNORECASE),
+    re.compile(r"\bdisregard\s+(my|your)\s+instructions?\b", re.IGNORECASE),
+    re.compile(r"\bignore\s+(my|your)\s+last\s+email\b", re.IGNORECASE),
+    re.compile(r"\bi\s+am\s+the\s+administrator\b", re.IGNORECASE),
 ]
-
-TIGHTER_PATTERNS: list[str] = [
-    # TODO 1b. Tighter: require an imperative verb AND an object meaning
-    # "the thing you were told before", so that "ignore my last email"
-    # survives and "ignore your instructions" does not.
-    #
-    # One warning that has already cost this lab a catch. `\binstruction\b`
-    # does NOT match "instructions", because the character after the word
-    # is a word character and the boundary fails. Write the plurals.
-    # Nothing will report an error; you will simply catch less.
+# TODO 1b. Tighter: require an imperative verb AND an object meaning
+# "the thing you were told before", so that "ignore my last email"
+# survives and "ignore your instructions" does not.
+#
+# One warning that has already cost this lab a catch. `\binstruction\b`
+# does NOT match "instructions", because the character after the word
+# is a word character and the boundary fails. Write the plurals.
+# Nothing will report an error; you will simply catch less.
+TIGHTER_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\b(ignore|forget|disregard)\s+my\s+(last|previous|prior)\s+(instruction|instructions|message|email|request)s?\b", re.IGNORECASE),
+    re.compile(r"\b(ignore|forget|disregard)\s+(the|those)\s+(last|previous|prior)\s+(instruction|instructions|message|email|request)s?\b", re.IGNORECASE),
 ]
 
 
@@ -127,7 +133,14 @@ def redact_marker(text: str) -> Verdict:
     contains, it does not defend, and knowing the difference is the point
     of declaring a placement at all.
     """
-    raise NotImplementedError("TODO 2: redact_marker")
+    if INJECTION_MARKER not in text:
+        return Verdict(False)
+
+    return Verdict(
+        fired=True,
+        rule="injection marker detected",
+        rewritten=text.replace(INJECTION_MARKER, "[REDACTED]"),
+    )
 
 
 def forbidden_tool_argument(argument: str) -> Verdict:
