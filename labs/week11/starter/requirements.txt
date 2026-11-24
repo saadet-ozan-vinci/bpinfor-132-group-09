@@ -1,0 +1,11 @@
+# Week 11, guardrails and verification. BPINFOR-132.
+#
+# This session is deliberately offline. The guards are code, the traffic is
+# a fixed corpus, and no model is called anywhere, so the list is short.
+pydantic>=2.9,<3     # the GuardEvent contract from the project spine
+pytest>=8.0          # the gates
+
+# Nothing else is needed. In particular there is no provider SDK and no
+# deepeval here: week 10 installed those for the judge, and week 11 does not
+# use them. A control you cannot reproduce is not a control, so this session
+# keeps every source of nondeterminism out of the room.
